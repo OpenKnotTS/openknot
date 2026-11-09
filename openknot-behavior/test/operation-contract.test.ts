@@ -44,6 +44,38 @@ test("deletions preserve their previous state and declared empty event arrays re
   assert.ok(Object.isFrozen(result.value.events));
 });
 
+test("a list of changes keeps each change type and freezes each change without copying its state", async () => {
+  const kept = { id: "a" };
+  const merged = { id: "b" };
+  const untouched = { id: "c" };
+  const merge = operation<void, { readonly id: string }, Removed>()({
+    run: () =>
+      success({
+        output: [
+          { changeType: "updated", next: kept },
+          { changeType: "deleted", previous: merged },
+          { changeType: "unchanged", current: untouched },
+        ],
+        events: [{ type: "Removed", id: merged.id }],
+      }),
+  });
+  const result = await standalone(merge)();
+  assert.ok(!result.isError);
+  assert.deepEqual(result.value.output, [
+    { changeType: "updated", next: kept },
+    { changeType: "deleted", previous: merged },
+    { changeType: "unchanged", current: untouched },
+  ]);
+  assert.ok(Object.isFrozen(result.value.output) && result.value.output.every((change) => Object.isFrozen(change)));
+  const [first] = result.value.output;
+  assert.ok(first?.changeType === "updated" && first.next === kept, "A change keeps its state by reference.");
+
+  const nothing = operation<void, { readonly id: string }, Removed>()({
+    run: () => success({ output: [], events: [] }),
+  });
+  assert.deepEqual(await standalone(nothing)(), success({ output: [], events: [] }));
+});
+
 test("untyped changes and malformed domain event envelopes fail inside the operation boundary", async () => {
   const sparseEvents: unknown[] = [];
   sparseEvents.length = 1;
@@ -51,7 +83,16 @@ test("untyped changes and malformed domain event envelopes fail inside the opera
     {},
     { output: null },
     { output: 1 },
-    { output: [] },
+    { output: [null] },
+    { output: [{ changeType: "created" }] },
+    {
+      output: [
+        { changeType: "updated", next: 1 },
+        { changeType: "deleted", next: 1 },
+      ],
+    },
+    { output: [], events: [{ type: "Removed" }] },
+    { output: [{ changeType: "unchanged", current: 1 }], events: [{ type: "Removed" }] },
     { output: { changeType: "custom", next: 1 } },
     { output: { changeType: "created" } },
     { output: { changeType: "updated", previous: 1 } },

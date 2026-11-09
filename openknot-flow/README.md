@@ -171,7 +171,7 @@ const roleWriters = plug({
 
 ### Persistence results
 
-`upserted(next)` returns `Upserted<State>` and Behavior's `deleted(previous)` returns `Deleted<Payload>`. The writer's author runs the query and checks its native result; Flow does not verify writes. `persist(output, { upsert, delete })` applies an operation output: `created`/`updated` upsert `next`, `deleted` deletes the full `previous`, `unchanged` writes nothing.
+`upserted(next)` returns `Upserted<State>` and Behavior's `deleted(previous)` returns `Deleted<Payload>`. The writer's author runs the query and checks its native result; Flow does not verify writes. `persist(output, { upsert, delete })` applies an operation output: `created`/`updated` upsert `next`, `deleted` deletes the full `previous`, `unchanged` writes nothing. A list of changes takes list writers such as `saveRoles(roles)`: one `upsert` call with every `next`, then one `delete` call with every `previous`, skipping a call with nothing to write. It returns the kept states in the list's order, without the deleted ones; the upsert writer returns one receipt per state, in order.
 
 ```ts
 const result = await ctx.renameRoleOp(input);

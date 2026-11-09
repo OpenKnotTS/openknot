@@ -30,19 +30,37 @@ export type OperationOutput<State> =
   | { readonly changeType: "deleted"; readonly previous: State; readonly next?: never; readonly current?: never }
   | { readonly changeType: "unchanged"; readonly current: State; readonly next?: never; readonly previous?: never };
 
-type EmittedEvents<Output, E extends Event> = Output extends { readonly changeType: "unchanged" } ? never : E;
-type ChangedDraft<Output, E extends Event> = Output extends { readonly changeType: "unchanged" }
-  ? never
-  : { readonly output: Output; readonly events: readonly E[] };
+/** One change, or the changes of several states of the same model. */
+type OperationChanges<State> = OperationOutput<State> | readonly OperationOutput<State>[];
+
+/** True when nothing changed: an unchanged output, or a list of only unchanged outputs (empty included). */
+type Unchanged<Output> = [Output] extends [readonly (infer Change)[]]
+  ? [Change] extends [{ readonly changeType: "unchanged" }]
+    ? true
+    : false
+  : [Output] extends [{ readonly changeType: "unchanged" }]
+    ? true
+    : false;
+
+type EmittedEvents<Output, E extends Event> = Output extends unknown
+  ? Unchanged<Output> extends true
+    ? never
+    : E
+  : never;
+type ChangedDraft<Output, E extends Event> = Output extends unknown
+  ? Unchanged<Output> extends true
+    ? never
+    : { readonly output: Output; readonly events: readonly E[] }
+  : never;
 
 export type OperationDraft<
-  Output extends OperationOutput<unknown> = OperationOutput<unknown>,
+  Output extends OperationChanges<unknown> = OperationChanges<unknown>,
   E extends Event = never,
 > = [E] extends [never]
   ? { readonly output: Output; readonly events?: never }
   : { readonly output: Output; readonly events: readonly never[] } | ChangedDraft<Output, E>;
 
-export type OperationSuccess<Output extends OperationOutput<unknown>, E extends Event = never> = [E] extends [never]
+export type OperationSuccess<Output extends OperationChanges<unknown>, E extends Event = never> = [E] extends [never]
   ? { readonly output: Output }
   : Output extends unknown
     ? { readonly output: Output; readonly events: readonly EmittedEvents<Output, E>[] }
@@ -52,7 +70,7 @@ type ExecutionResult<Draft> = Outcome<Draft, Error> | PromiseLike<Outcome<Draft,
 
 /** Heterogeneous execution boundary; authoring uses the declared event contract. */
 export type OperationExecutionResult = ExecutionResult<{
-  readonly output: OperationOutput<unknown>;
+  readonly output: OperationChanges<unknown>;
   readonly events?: readonly Event[];
 }>;
 
@@ -73,16 +91,18 @@ export type ResolvedRequirements<R extends Requirements> = {
   readonly [K in keyof R]: ResolvedRequirement<R[K]>;
 };
 
-type ChangeValue<Output> = Output extends {
-  readonly changeType: infer Kind extends "created" | "updated";
-  readonly next: infer State;
-}
-  ? { readonly changeType: Kind; readonly next: State }
-  : Output extends { readonly changeType: "deleted"; readonly previous: infer State }
-    ? { readonly changeType: "deleted"; readonly previous: State }
-    : Output extends { readonly changeType: "unchanged"; readonly current: infer State }
-      ? { readonly changeType: "unchanged"; readonly current: State }
-      : never;
+type ChangeValue<Output> = Output extends readonly (infer Change)[]
+  ? readonly ChangeValue<Change>[]
+  : Output extends {
+        readonly changeType: infer Kind extends "created" | "updated";
+        readonly next: infer State;
+      }
+    ? { readonly changeType: Kind; readonly next: State }
+    : Output extends { readonly changeType: "deleted"; readonly previous: infer State }
+      ? { readonly changeType: "deleted"; readonly previous: State }
+      : Output extends { readonly changeType: "unchanged"; readonly current: infer State }
+        ? { readonly changeType: "unchanged"; readonly current: State }
+        : never;
 
 type OutputOf<Draft> = Draft extends { readonly output: infer Output } ? ChangeValue<Output> : never;
 
@@ -119,8 +139,8 @@ export type OperationEvents<D extends OperationDefinition> =
 export interface OperationFactory<Input, State = unknown, E extends Event = never> {
   <
     const R extends Requirements = NoRequirements,
-    Result extends ExecutionResult<OperationDraft<OperationOutput<State>, E>> = ExecutionResult<
-      OperationDraft<OperationOutput<State>, E>
+    Result extends ExecutionResult<OperationDraft<OperationChanges<State>, E>> = ExecutionResult<
+      OperationDraft<OperationChanges<State>, E>
     >,
   >(
     options: RequirementsOptions<R> & {

@@ -22,6 +22,39 @@ function readerBoundary(read: Read, boundary: string): Read {
   return (...args) => mapFailure(() => read(...args), foreign);
 }
 
+/** Validates one authored change and returns a frozen copy that keeps its state by reference. */
+function changeOf(output: unknown): OperationOutput<unknown> {
+  if (typeof output !== "object" || output === null) {
+    throw new TypeError("Operation output must describe a created, updated, deleted or unchanged result.");
+  }
+
+  const changeType = (output as { readonly changeType?: unknown }).changeType;
+
+  switch (changeType) {
+    case "created":
+    case "updated":
+      if (!("next" in output) || "previous" in output || "current" in output) {
+        throw new TypeError("Created/updated changes require only a next state.");
+      }
+      return Object.freeze({ changeType, next: output.next });
+
+    case "deleted":
+      if (!("previous" in output) || "next" in output || "current" in output) {
+        throw new TypeError("Deleted changes require only a previous state.");
+      }
+      return Object.freeze({ changeType, previous: output.previous });
+
+    case "unchanged":
+      if (!("current" in output) || "next" in output || "previous" in output) {
+        throw new TypeError("Unchanged results require only a current state.");
+      }
+      return Object.freeze({ changeType, current: output.current });
+
+    default:
+      throw new TypeError("Operation output must describe a created, updated, deleted or unchanged result.");
+  }
+}
+
 /** Shared execution boundary; callers resolve dependencies before constructing it. */
 export function createOperationExecutor(
   definition: OperationDefinition,
@@ -56,41 +89,9 @@ export function createOperationExecutor(
         throw new TypeError("Operation success must contain an output field.");
       }
 
-      const output = draft.output;
-
-      if (typeof output !== "object" || output === null) {
-        throw new TypeError("Operation output must describe a created, updated, deleted or unchanged result.");
-      }
-
-      const changeType = output.changeType;
-      let change: OperationOutput<unknown>;
-
-      switch (changeType) {
-        case "created":
-        case "updated":
-          if (!("next" in output) || "previous" in output || "current" in output) {
-            throw new TypeError("Created/updated changes require only a next state.");
-          }
-          change = Object.freeze({ changeType, next: output.next });
-          break;
-
-        case "deleted":
-          if (!("previous" in output) || "next" in output || "current" in output) {
-            throw new TypeError("Deleted changes require only a previous state.");
-          }
-          change = Object.freeze({ changeType, previous: output.previous });
-          break;
-
-        case "unchanged":
-          if (!("current" in output) || "next" in output || "previous" in output) {
-            throw new TypeError("Unchanged results require only a current state.");
-          }
-          change = Object.freeze({ changeType, current: output.current });
-          break;
-
-        default:
-          throw new TypeError("Operation output must describe a created, updated, deleted or unchanged result.");
-      }
+      const authored: unknown = draft.output;
+      const change = Array.isArray(authored) ? Object.freeze(Array.from(authored, changeOf)) : changeOf(authored);
+      const changes: readonly OperationOutput<unknown>[] = Array.isArray(change) ? change : [change];
 
       if (!("events" in draft)) {
         return success(Object.freeze({ output: change }));
@@ -104,8 +105,8 @@ export function createOperationExecutor(
 
       const snapshot: unknown[] = [...events];
 
-      if (changeType === "unchanged" && snapshot.length !== 0) {
-        throw new TypeError("Unchanged operations cannot emit events.");
+      if (snapshot.length !== 0 && changes.every(({ changeType }) => changeType === "unchanged")) {
+        throw new TypeError("Operations without changes cannot emit events.");
       }
 
       for (const event of snapshot) {

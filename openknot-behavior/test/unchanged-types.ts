@@ -1,5 +1,5 @@
 import type { ErrorOf, Event, OperationDraft } from "../src/index.ts";
-import { error, failure, operation, reader, standalone, success } from "../src/index.ts";
+import { error, failure, operation, reader, standalone, success, unchanged, updated } from "../src/index.ts";
 import { override } from "@openknot-ts/wire";
 import type { Application } from "@openknot-ts/wire";
 import "../src/wire.ts";
@@ -100,3 +100,31 @@ const emptyDecision = operation<{ readonly current: State; readonly changed: boo
     }),
 });
 void emptyDecision;
+
+// A list carries changes of the same state, each with its own change type.
+const merge = operation<readonly State[], State, Changed>()({
+  run: ([kept, merged]) =>
+    success({
+      output: [
+        { changeType: "updated", next: kept! },
+        { changeType: "deleted", previous: merged! },
+      ],
+      events: [{ type: "Changed", name: kept!.name }],
+    }),
+});
+export async function verifyChangeList(input: readonly State[]): Promise<void> {
+  const merged = await standalone(merge)(input);
+  if (!merged.isError) {
+    for (const change of merged.value.output) {
+      expectType<State>(change.changeType === "deleted" ? change.previous : change.next);
+    }
+    expectType<readonly Changed[]>(merged.value.events);
+  }
+}
+// A list's contents are known only at runtime, which refuses events from a list without changes.
+operation<State, State, Changed>()({ run: (current) => success({ output: [unchanged(current)], events: [] }) });
+operation<State, State, Changed>()({ run: () => success({ output: [], events: [] }) });
+operation<State, State>()({
+  // @ts-expect-error every change in the list carries the declared state
+  run: (current) => success({ output: [updated(current), updated(1)] }),
+});

@@ -26,33 +26,82 @@ type ChangedState<O> = O extends { readonly changeType: "created" | "updated"; r
       ? State
       : never;
 
-type UpsertWriter<State> = (state: State) => PromiseLike<Upserted<State>>;
-type DeleteWriter<State> = (state: State) => PromiseLike<Deleted<State>>;
+type Changes = OperationOutput<unknown> | readonly OperationOutput<unknown>[];
+type ChangeItem<O> = [O] extends [readonly (infer Change)[]] ? Change : O;
+
+/** A single output writes one state; a list writes its states in one call. A mix of both has no writer. */
+type Write<O, State, Receipt> = [O] extends [readonly unknown[]]
+  ? (states: readonly State[]) => PromiseLike<readonly Receipt[]>
+  : [O] extends [OperationOutput<unknown>]
+    ? (state: State) => PromiseLike<Receipt>
+    : never;
 
 /** The writers persist() needs: an upsert when the output can create or update, a delete when it can delete. */
-export type PersistWriters<O extends OperationOutput<unknown>, State = ChangedState<O>> = ([
-  ChangeOf<O, "created" | "updated">,
+export type PersistWriters<O extends Changes, State = ChangedState<ChangeItem<O>>> = ([
+  ChangeOf<ChangeItem<O>, "created" | "updated">,
 ] extends [never]
-  ? { readonly upsert?: UpsertWriter<State> }
-  : { readonly upsert: UpsertWriter<State> }) &
-  ([ChangeOf<O, "deleted">] extends [never]
-    ? { readonly delete?: DeleteWriter<State> }
-    : { readonly delete: DeleteWriter<State> });
+  ? { readonly upsert?: Write<O, State, Upserted<State>> }
+  : { readonly upsert: Write<O, State, Upserted<State>> }) &
+  ([ChangeOf<ChangeItem<O>, "deleted">] extends [never]
+    ? { readonly delete?: Write<O, State, Deleted<State>> }
+    : { readonly delete: Write<O, State, Deleted<State>> });
 
-/** The persisted state: the upserted or unchanged state, or undefined once deleted. */
-export type Persisted<O extends OperationOutput<unknown>> =
-  | ChangedState<Exclude<O, ChangeOf<O, "deleted">>>
-  | ([ChangeOf<O, "deleted">] extends [never] ? never : undefined);
+/** The persisted state: the upserted or unchanged state, or undefined once deleted; a list keeps its order and drops deletions. */
+export type Persisted<O extends Changes> = [O] extends [readonly (infer Change)[]]
+  ? readonly ChangedState<Exclude<Change, ChangeOf<Change, "deleted">>>[]
+  : ChangedState<Exclude<O, ChangeOf<O, "deleted">>> | ([ChangeOf<O, "deleted">] extends [never] ? never : undefined);
 
-/** Applies an operation's output: created/updated upsert their next state, deleted deletes its previous state, unchanged writes nothing. */
-export function persist<const O extends OperationOutput<unknown>>(
-  output: O,
-  writers: PersistWriters<O>,
-): Promise<Persisted<O>>;
-export async function persist(
-  output: OperationOutput<unknown>,
-  writers: { readonly upsert?: UpsertWriter<unknown>; readonly delete?: DeleteWriter<unknown> },
-): Promise<unknown> {
+type Writers<Upsert, Delete> = { readonly upsert?: Upsert; readonly delete?: Delete };
+type SingleWriters = Writers<
+  (state: unknown) => PromiseLike<Upserted<unknown>>,
+  (state: unknown) => PromiseLike<unknown>
+>;
+type ListWriters = Writers<
+  (states: readonly unknown[]) => PromiseLike<readonly Upserted<unknown>[]>,
+  (states: readonly unknown[]) => PromiseLike<unknown>
+>;
+
+/**
+ * Applies an operation's output: created/updated upsert their next state, deleted deletes its previous state, unchanged
+ * writes nothing. A list upserts all its next states in one call, then deletes all its previous states in one call.
+ */
+export function persist<const O extends Changes>(output: O, writers: PersistWriters<O>): Promise<Persisted<O>>;
+export async function persist(output: Changes, writers: Writers<unknown, unknown>): Promise<unknown> {
+  return Array.isArray(output)
+    ? persistList(output, writers as ListWriters)
+    : persistOne(output as OperationOutput<unknown>, writers as SingleWriters);
+}
+
+async function persistList(outputs: readonly OperationOutput<unknown>[], writers: ListWriters): Promise<unknown[]> {
+  const upserts = outputs.flatMap((output) =>
+    output.changeType === "created" || output.changeType === "updated" ? [output.next] : [],
+  );
+  const deletions = outputs.flatMap((output) => (output.changeType === "deleted" ? [output.previous] : []));
+  const receipts = upserts.length === 0 ? [] : await writers.upsert!(upserts);
+
+  if (receipts.length !== upserts.length) {
+    throw new TypeError(`An upsert writer returned ${receipts.length} receipts for ${upserts.length} states.`);
+  }
+
+  if (deletions.length !== 0) {
+    await writers.delete!(deletions);
+  }
+
+  let written = 0;
+  return outputs.flatMap((output) => {
+    switch (output.changeType) {
+      case "created":
+      case "updated":
+        return [receipts[written++]!.next];
+      case "deleted":
+        return [];
+      case "unchanged":
+        return [output.current];
+    }
+  });
+}
+
+async function persistOne(output: OperationOutput<unknown>, writers: SingleWriters): Promise<unknown> {
   switch (output.changeType) {
     case "created":
     case "updated":

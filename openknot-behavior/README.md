@@ -99,10 +99,12 @@ Every success carries a fixed `output`, built with a helper:
 
 The type is `OperationOutput<State>`; `Deleted<Payload>` names a deletion result and also types persistence writers. Helpers freeze their own wrapper and keep the state by reference.
 
+One decision that changes several states of the same model returns a list, each change with its own type, for example `output: [updated(kept), deleted(merged)]`. An empty list means nothing changed.
+
 ### Events
 
 - With an `Event` type, `run` returns `events: readonly Event[]` (`[]` when none). Without one, results have no `events` property and authoring rejects them.
-- `unchanged` results must carry an empty event array.
+- `unchanged` results, and lists of only `unchanged` results or no results, must carry an empty event array.
 - `Event` is a types-only `{ readonly type: string }`. Name each model's union `<ModelName>Event`, such as `RoleEvent`, with a variant per `type`, for example `interface RoleRenamed extends Event<"RoleRenamed"> { readonly role: RoleState }`.
 - Child operations in `ctx` return their own results; their events are never merged automatically.
 

@@ -110,3 +110,18 @@ persist(kept, { upsert: upsertState, delete: async (id: string) => deleted(id) }
 // @ts-expect-error The delete writer deletes with the full previous state.
 persist(anyChange, { upsert: upsertState, delete: async (id: string) => deleted(id) });
 void notDeleted;
+
+// A list of changes writes through list writers and returns the kept states.
+const upsertStates = async (states: readonly State[]) => states.map((state) => upserted(state));
+const deleteStates = async (states: readonly State[]) => states.map((state) => deleted(state));
+declare const changes: readonly OperationOutput<State>[];
+const keptStates: Promise<readonly State[]> = persist(changes, { upsert: upsertStates, delete: deleteStates });
+const createdStates: Promise<readonly State[]> = persist([created({ id: "a" })], { upsert: upsertStates });
+void [keptStates, createdStates];
+// @ts-expect-error A list needs list writers.
+persist(changes, { upsert: upsertState, delete: deleteState });
+// @ts-expect-error A list that can delete needs a delete writer.
+persist(changes, { upsert: upsertStates });
+declare const oneOrMany: OperationOutput<State> | readonly OperationOutput<State>[];
+// @ts-expect-error An output that is either one change or a list has no single writer shape.
+persist(oneOrMany, { upsert: upsertStates, delete: deleteStates });

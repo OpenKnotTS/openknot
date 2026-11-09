@@ -454,7 +454,7 @@ test("a transaction that fails to open fails the access that opened it", async (
 });
 
 test("committed and rolled-back transactions keep none of their native sessions reachable", async (t) => {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   const db = await database(t),
     uow = drizzleUnitOfWork({ database: db }),
     rollback = new Error("roll back");
@@ -476,7 +476,8 @@ test("committed and rolled-back transactions keep none of their native sessions 
   }
   // The current job keeps its objects alive until it ends, in the next turn of the event loop.
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
   assert.equal(sessions.length, 60);
   assert.equal(sessions.filter((session) => session.deref() !== undefined).length, 0);
   assert.equal((await db.select().from(records)).length, 30);

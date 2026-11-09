@@ -288,7 +288,7 @@ test("duplicate tracing modules fail before consumer SDK resources are acquired"
 });
 
 test("a stopped traced application releases its SDK once and keeps nothing reachable or scheduled", async () => {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   // Only timers created from here on count: other tests' in-memory exporters schedule their own.
   const timers = new Set<number>();
   const watch = createHook({
@@ -344,7 +344,8 @@ test("a stopped traced application releases its SDK once and keeps nothing reach
   const application = await stopped();
   // The current job keeps its objects alive, and cleared timers report, until the next turn of the event loop.
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
   watch.disable();
   assert.equal(released, 1);
   assert.ok(exported >= 60, `${exported} spans exported`);

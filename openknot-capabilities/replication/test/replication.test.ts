@@ -213,7 +213,7 @@ function nextReload(w: World, local: Map<string, Role>): Promise<void> {
 }
 
 test("stopped instances keep none of their layers or subscriptions reachable and leave no timer", async () => {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   const timers = () => process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
   const before = timers();
   // The store, channel and lock outlive the instances, which they must not keep alive.
@@ -232,7 +232,8 @@ test("stopped instances keep none of their layers or subscriptions reachable and
   const applications = await stopped();
   // The current job keeps its objects alive until it ends, in the next turn of the event loop.
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
   assert.deepEqual(
     applications.map((application) => application.deref()),
     [undefined, undefined],

@@ -11,10 +11,11 @@ import { z } from "zod";
 
 /** The current job keeps the objects it created alive until it ends: two turns of the event loop, then a collection. */
 async function collect(): Promise<void> {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   await new Promise((resolve) => setImmediate(resolve));
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
 }
 
 const RoleNameTaken = error("RoleNameTaken", (role: string) => ({ message: `Role ${role} exists`, role }));

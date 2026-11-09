@@ -111,7 +111,7 @@ async function run(definitions: readonly object[], work: Definition) {
 }
 
 test("a stopped application keeps none of its cache layers reachable and leaves no timer", async () => {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   const timers = () => process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
   const before = timers();
   // The ports are module-level and outlive the application, which they must not keep alive.
@@ -132,7 +132,8 @@ test("a stopped application keeps none of its cache layers reachable and leaves 
   const application = await stopped();
   // The current job keeps its objects alive until it ends, in the next turn of the event loop.
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
   assert.equal(application.deref(), undefined);
   assert.equal(timers(), before);
 });

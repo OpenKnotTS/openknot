@@ -21,9 +21,10 @@ import { test } from "node:test";
 
 /** Collects garbage once the current job no longer keeps its objects alive, in the next turn of the event loop. */
 async function collect(): Promise<void> {
-  const gc = (globalThis as { gc?: () => void }).gc ?? assert.fail("run with node --expose-gc");
+  const gc = (globalThis as { gc?: (options: object) => void }).gc ?? assert.fail("run with node --expose-gc");
   await new Promise((resolve) => setImmediate(resolve));
-  gc();
+  // A full collection: a single regular cycle can leave unreachable objects behind under load.
+  gc({ type: "major", execution: "sync", flavor: "last-resort" });
 }
 
 const Refused = error("Refused");

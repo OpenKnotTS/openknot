@@ -1,5 +1,5 @@
-/** The example shown in the root README, kept compiling so it cannot drift from the API. */
-import { defineApplication, plug, runApplication } from "@openknot-ts/core";
+/** The example shown in the root README, kept compiling so it cannot drift from the API. Each numbered section is one README block. */
+import { defineApplication, plug, providePlugs, runApplication } from "@openknot-ts/core";
 import { error, failure, model, operation, reader, success, updated } from "@openknot-ts/core/behavior";
 import type { Event } from "@openknot-ts/core/behavior";
 import { command, expose, guard, publisher, upserted, writer } from "@openknot-ts/core/flow";
@@ -11,7 +11,7 @@ import { trpcFastify } from "@openknot-ts/trpc-fastify";
 import { trpcRouter } from "@openknot-ts/trpc-router";
 import { z } from "zod";
 
-// Behavior: the state and its invariants, the contracts it reads through and the change they allow
+// 1. Behavior
 const userSchema = z.object({ id: z.string(), name: z.string().min(1), email: z.email() }).readonly();
 type UserState = z.infer<typeof userSchema>;
 
@@ -21,8 +21,6 @@ type UserEvent = Event & {
   readonly email: string;
 };
 
-type ChangeEmailInput = { user: UserState; email: string };
-
 const User = model({
   invariants: userSchema,
   mutations: {
@@ -30,16 +28,14 @@ const User = model({
   },
 });
 
-const UserNotFound = error("UserNotFound", (id: string) => ({ message: `User ${id} was not found`, id }));
+type ChangeEmailInput = { user: UserState; email: string };
+
+const emailExistsReader = reader<(email: string) => Promise<boolean>>();
+
 const EmailAlreadyTaken = error("EmailAlreadyTaken", (email: string) => ({
   message: `Email ${email} is already taken`,
   email,
 }));
-
-const findUserReader = reader<(id: string) => Promise<UserState | undefined>>();
-const emailExistsReader = reader<(email: string) => Promise<boolean>>();
-const isAdminReader = reader<(userId: string | undefined) => Promise<boolean>>();
-const userReaders = reader.compose({ findUserReader, emailExistsReader, isAdminReader });
 
 const changeUserEmailOperation = operation<ChangeEmailInput, UserState, UserEvent>()({
   requirements: { emailExistsReader },
@@ -61,17 +57,14 @@ const changeUserEmailOperation = operation<ChangeEmailInput, UserState, UserEven
   },
 });
 
-// Flow: output contracts, a guard and the command that runs the use case
+// 2. Flow: orchestration
+type ChangeEmailRequest = { id: string; email: string };
+
+const findUserReader = reader<(id: string) => Promise<UserState | undefined>>();
 const saveUserWriter = writer<(user: UserState) => Promise<Upserted<UserState>>>();
 const userEventsPublisher = publisher<UserEvent>();
 
-const AccessDenied = error("AccessDenied");
-const isAdmin = guard({
-  requirements: { isAdminReader },
-  run: async (_input, ctx) => ((await ctx.isAdminReader(ctx.actor?.userId)) ? success() : failure(AccessDenied())),
-});
-
-type ChangeEmailRequest = { id: string; email: string };
+const UserNotFound = error("UserNotFound", (id: string) => ({ message: `User ${id} was not found`, id }));
 
 const changeUserEmailCommand = command<ChangeEmailRequest, UserState>()({
   requirements: { findUserReader, changeUserEmailOperation, saveUserWriter, userEventsPublisher },
@@ -98,7 +91,15 @@ const changeUserEmailCommand = command<ChangeEmailRequest, UserState>()({
   },
 });
 
-// Input ports: what transports call
+// 3. Flow: exposure
+const isAdminReader = reader<(userId: string | undefined) => Promise<boolean>>();
+const AccessDenied = error("AccessDenied");
+
+const isAdmin = guard({
+  requirements: { isAdminReader },
+  run: async (_input, ctx) => ((await ctx.isAdminReader(ctx.actor?.userId)) ? success() : failure(AccessDenied())),
+});
+
 const changeEmailEndpoint = expose({ handler: changeUserEmailCommand, guards: { isAdmin } });
 
 const getUserEndpoint = expose<string>()({
@@ -108,11 +109,11 @@ const getUserEndpoint = expose<string>()({
 
 const userApi = expose.compose({ changeEmailEndpoint, getUserEndpoint });
 
-// Plugs: in-memory implementations of the contracts, the actor behind a Bearer token, and tRPC over the input ports
+// 4. Plugs
 const usersById = new Map<string, UserState>([["u1", { id: "u1", name: "Ada", email: "ada@example.com" }]]);
 
 const inMemoryUserReaders = plug({
-  port: userReaders,
+  port: reader.compose({ findUserReader, emailExistsReader, isAdminReader }),
   bind: () => ({
     findUserReader: async (id: string) => usersById.get(id),
     emailExistsReader: async (email: string) => [...usersById.values()].some((user) => user.email === email),
@@ -135,6 +136,8 @@ const consoleEventsPublisher = plug({
   },
 });
 
+const io = providePlugs([inMemoryUserReaders, inMemoryUserWriter, consoleEventsPublisher]);
+
 const tokenActors = actorResolver({
   resolve: (token: string) => (token === "admin-token" ? { userId: "admin" } : undefined),
 });
@@ -150,19 +153,13 @@ const userRouter = trpcRouter({
   }),
 });
 
-// Container: the input ports, the implementations it selects, and tRPC on Fastify
+const transport = providePlugs([tokenActors, userRouter]);
+
+// 5. Application
 const app = await runApplication(
   defineApplication({
     inputs: [userApi],
-    modules: [
-      inMemoryUserReaders,
-      inMemoryUserWriter,
-      consoleEventsPublisher,
-      tokenActors,
-      userRouter,
-      fastifyHttp,
-      trpcFastify,
-    ],
+    modules: [io, transport, fastifyHttp, trpcFastify],
   }),
 );
 

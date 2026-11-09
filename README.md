@@ -55,22 +55,13 @@ pnpm add @openknot-ts/fastify-server @openknot-ts/trpc-fastify @openknot-ts/trpc
 
 ## Example
 
-Changing a user's email, from start to finish: the rule in Behavior, where a Zod schema holds the invariants every change must satisfy, a guarded command that persists the change and publishes its event, a read that runs inline in its exposure, tRPC procedures served by Fastify, in-memory plugs for the contracts, and the container that selects them:
+Changing a user's email, step by step. The blocks are one runnable file, [readme-example.ts](openknot/test/readme-example.ts), which also holds the imports.
+
+### 1. Behavior
+
+Pure business rules. The schema validates every result a mutation returns; an invalid one becomes a `ModelValidationError`. An operation can require only readers and other operations: giving it a writer or publisher fails to compile, so business rules cannot persist or publish.
 
 ```ts
-import { defineApplication, plug, runApplication } from "@openknot-ts/core";
-import { error, failure, model, operation, reader, success, updated } from "@openknot-ts/core/behavior";
-import type { Event } from "@openknot-ts/core/behavior";
-import { command, expose, guard, publisher, upserted, writer } from "@openknot-ts/core/flow";
-import type { Upserted } from "@openknot-ts/core/flow";
-import { actorResolver } from "@openknot-ts/core/flow/wire";
-import { fastifyHttp, fastifyServer } from "@openknot-ts/fastify-server";
-import { trpcAuthentication } from "@openknot-ts/trpc-context/wire";
-import { trpcFastify } from "@openknot-ts/trpc-fastify";
-import { trpcRouter } from "@openknot-ts/trpc-router";
-import { z } from "zod";
-
-// Behavior: the state and its invariants, the contracts it reads through and the change they allow
 const userSchema = z.object({ id: z.string(), name: z.string().min(1), email: z.email() }).readonly();
 type UserState = z.infer<typeof userSchema>;
 
@@ -80,8 +71,6 @@ type UserEvent = Event & {
   readonly email: string;
 };
 
-type ChangeEmailInput = { user: UserState; email: string };
-
 const User = model({
   invariants: userSchema,
   mutations: {
@@ -89,16 +78,14 @@ const User = model({
   },
 });
 
-const UserNotFound = error("UserNotFound", (id: string) => ({ message: `User ${id} was not found`, id }));
+type ChangeEmailInput = { user: UserState; email: string };
+
+const emailExistsReader = reader<(email: string) => Promise<boolean>>();
+
 const EmailAlreadyTaken = error("EmailAlreadyTaken", (email: string) => ({
   message: `Email ${email} is already taken`,
   email,
 }));
-
-const findUserReader = reader<(id: string) => Promise<UserState | undefined>>();
-const emailExistsReader = reader<(email: string) => Promise<boolean>>();
-const isAdminReader = reader<(userId: string | undefined) => Promise<boolean>>();
-const userReaders = reader.compose({ findUserReader, emailExistsReader, isAdminReader });
 
 const changeUserEmailOperation = operation<ChangeEmailInput, UserState, UserEvent>()({
   requirements: { emailExistsReader },
@@ -119,18 +106,24 @@ const changeUserEmailOperation = operation<ChangeEmailInput, UserState, UserEven
     });
   },
 });
+```
 
-// Flow: output contracts, a guard and the command that runs the use case
+### 2. Flow
+
+Flow coordinates the use case in two parts.
+
+#### Orchestration
+
+The command orchestrates the use case: load the user, apply the operation, persist and publish. It runs in a Unit of Work, and the event is delivered only after commit; on rollback it is discarded.
+
+```ts
+type ChangeEmailRequest = { id: string; email: string };
+
+const findUserReader = reader<(id: string) => Promise<UserState | undefined>>();
 const saveUserWriter = writer<(user: UserState) => Promise<Upserted<UserState>>>();
 const userEventsPublisher = publisher<UserEvent>();
 
-const AccessDenied = error("AccessDenied");
-const isAdmin = guard({
-  requirements: { isAdminReader },
-  run: async (_input, ctx) => ((await ctx.isAdminReader(ctx.actor?.userId)) ? success() : failure(AccessDenied())),
-});
-
-type ChangeEmailRequest = { id: string; email: string };
+const UserNotFound = error("UserNotFound", (id: string) => ({ message: `User ${id} was not found`, id }));
 
 const changeUserEmailCommand = command<ChangeEmailRequest, UserState>()({
   requirements: { findUserReader, changeUserEmailOperation, saveUserWriter, userEventsPublisher },
@@ -156,8 +149,21 @@ const changeUserEmailCommand = command<ChangeEmailRequest, UserState>()({
     return success(saved.next);
   },
 });
+```
 
-// Input ports: what transports call
+#### Exposure
+
+The input ports transports call. Guards belong to the exposure and run before its handler, so the command knows nothing about access. Only input ports can be an application's inputs: listing a command or guard there fails to compile. A read needs no handler of its own; it runs inline in its exposure.
+
+```ts
+const isAdminReader = reader<(userId: string | undefined) => Promise<boolean>>();
+const AccessDenied = error("AccessDenied");
+
+const isAdmin = guard({
+  requirements: { isAdminReader },
+  run: async (_input, ctx) => ((await ctx.isAdminReader(ctx.actor?.userId)) ? success() : failure(AccessDenied())),
+});
+
 const changeEmailEndpoint = expose({ handler: changeUserEmailCommand, guards: { isAdmin } });
 
 const getUserEndpoint = expose<string>()({
@@ -166,12 +172,17 @@ const getUserEndpoint = expose<string>()({
 });
 
 const userApi = expose.compose({ changeEmailEndpoint, getUserEndpoint });
+```
 
-// Plugs: in-memory implementations of the contracts, the actor behind a Bearer token, and tRPC over the input ports
+### 3. Plugs
+
+Implementations of the contracts, grouped where they belong: `io` holds in-memory storage and a console publisher, `transport` the actor behind a Bearer token and tRPC procedures over the input ports.
+
+```ts
 const usersById = new Map<string, UserState>([["u1", { id: "u1", name: "Ada", email: "ada@example.com" }]]);
 
 const inMemoryUserReaders = plug({
-  port: userReaders,
+  port: reader.compose({ findUserReader, emailExistsReader, isAdminReader }),
   bind: () => ({
     findUserReader: async (id: string) => usersById.get(id),
     emailExistsReader: async (email: string) => [...usersById.values()].some((user) => user.email === email),
@@ -194,6 +205,8 @@ const consoleEventsPublisher = plug({
   },
 });
 
+const io = providePlugs([inMemoryUserReaders, inMemoryUserWriter, consoleEventsPublisher]);
+
 const tokenActors = actorResolver({
   resolve: (token: string) => (token === "admin-token" ? { userId: "admin" } : undefined),
 });
@@ -209,19 +222,18 @@ const userRouter = trpcRouter({
   }),
 });
 
-// Container: the input ports, the implementations it selects, and tRPC on Fastify
+const transport = providePlugs([tokenActors, userRouter]);
+```
+
+### 4. Application
+
+The application names its input ports and selects implementations; everything else follows from requirements. A missing implementation fails to compile.
+
+```ts
 const app = await runApplication(
   defineApplication({
     inputs: [userApi],
-    modules: [
-      inMemoryUserReaders,
-      inMemoryUserWriter,
-      consoleEventsPublisher,
-      tokenActors,
-      userRouter,
-      fastifyHttp,
-      trpcFastify,
-    ],
+    modules: [io, transport, fastifyHttp, trpcFastify],
   }),
 );
 

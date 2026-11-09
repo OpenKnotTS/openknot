@@ -51,10 +51,14 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      # The release commit and tag belong to whoever ran the workflow, through their GitHub noreply address.
       - name: Commit and tag
+        env:
+          ACTOR: ${{ github.actor }}
+          ACTOR_ID: ${{ github.actor_id }}
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "$ACTOR"
+          git config user.email "$ACTOR_ID+$ACTOR@users.noreply.github.com"
           git diff --quiet || git commit -am "Release v$VERSION"
           git tag "v$VERSION"
           git push --atomic origin HEAD "refs/tags/v$VERSION"

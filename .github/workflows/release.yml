@@ -46,10 +46,12 @@ jobs:
       - run: pnpm test
 
       # Versions already on npm are skipped, so a failed release can be run again with the same version.
+      # npm itself publishes and reads provenance from its config; pnpm does not forward --provenance.
       - name: Publish
-        run: pnpm -r --filter "@openknot-ts/*" publish --access public --tag "$TAG" --provenance --no-git-checks
+        run: pnpm -r --filter "@openknot-ts/*" publish --access public --tag "$TAG" --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_PROVENANCE: "true"
 
       # The release commit and tag belong to whoever ran the workflow, through their GitHub noreply address.
       - name: Commit and tag

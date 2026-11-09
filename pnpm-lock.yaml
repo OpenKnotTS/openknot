@@ -413,12 +413,33 @@ importers:
         specifier: workspace:*
         version: link:../openknot-wire
     devDependencies:
+      '@openknot-ts/fastify-server':
+        specifier: workspace:*
+        version: link:../openknot-plugs/fastify/fastify-server
+      '@openknot-ts/trpc-context':
+        specifier: workspace:*
+        version: link:../openknot-plugs/trpc/trpc-context
+      '@openknot-ts/trpc-fastify':
+        specifier: workspace:*
+        version: link:../openknot-plugs/trpc/trpc-fastify
+      '@openknot-ts/trpc-router':
+        specifier: workspace:*
+        version: link:../openknot-plugs/trpc/trpc-router
+      '@trpc/server':
+        specifier: 'catalog:'
+        version: 11.22.1(typescript@7.0.2)
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
+      fastify:
+        specifier: 'catalog:'
+        version: 5.12.7
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.7
 
   openknot-behavior:
     dependencies:

@@ -1,0 +1,61 @@
+{
+  "name": "@openknot-ts/drizzle-outbox",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Drizzle storage for the OpenKnot outbox: records saved in the Unit of Work transaction and claimed by the database clock.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/drizzle/drizzle-outbox"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    "./sqlite": {
+      "types": "./dist/sqlite.d.ts",
+      "import": "./dist/sqlite.js"
+    },
+    "./pg": {
+      "types": "./dist/pg.d.ts",
+      "import": "./dist/pg.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build",
+    "example": "node examples/outbox.ts",
+    "test:postgres": "node --test --test-isolation=none test/postgres.integration.ts"
+  },
+  "peerDependencies": {
+    "@openknot-ts/drizzle-uow": "workspace:^",
+    "@openknot-ts/outbox": "workspace:^",
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "dependencies": {
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@libsql/client": "catalog:",
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/drizzle-uow": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/outbox": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@openknot-ts/postgres-client": "workspace:*",
+    "pg": "catalog:",
+    "@types/pg": "catalog:"
+  }
+}

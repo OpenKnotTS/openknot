@@ -1,0 +1,50 @@
+{
+  "name": "@openknot-ts/knot-rest-http-node",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Serves OpenKnot REST routes on the native Node HTTP host.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/knot/knot-rest-http-node"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --expose-gc --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build",
+    "example": "node examples/rest.ts"
+  },
+  "peerDependencies": {
+    "@openknot-ts/knot-http-node": "workspace:^",
+    "@openknot-ts/knot-rest": "workspace:^",
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "devDependencies": {
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/knot-http-node": "workspace:*",
+    "@openknot-ts/knot-rest": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "zod": "catalog:"
+  }
+}

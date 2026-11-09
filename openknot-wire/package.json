@@ -1,0 +1,58 @@
+{
+  "name": "@openknot-ts/wire",
+  "version": "0.1.0",
+  "description": "Functional dependency injection, typed reference composition and application lifecycle.",
+  "type": "module",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-wire"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./internal/plug-bindings": {
+      "types": "./dist/internal/plug-bindings.d.ts",
+      "import": "./dist/internal/plug-bindings.js"
+    },
+    "./internal/marker": {
+      "types": "./dist/internal/marker.d.ts",
+      "import": "./dist/internal/marker.js"
+    },
+    "./internal/requirements": {
+      "types": "./dist/internal/requirements.d.ts",
+      "import": "./dist/internal/requirements.js"
+    },
+    "./internal/synchronous": {
+      "types": "./dist/internal/synchronous.d.ts",
+      "import": "./dist/internal/synchronous.js"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "scripts": {
+    "prepack": "pnpm build",
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --expose-gc --test --test-isolation=none test/*.test.ts",
+    "example": "pnpm build && node examples/role-api/application.ts"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

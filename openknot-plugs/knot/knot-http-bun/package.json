@@ -1,0 +1,55 @@
+{
+  "name": "@openknot-ts/knot-http-bun",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Native Bun HTTP server lifecycle and draining for OpenKnot applications.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/knot/knot-http-bun"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "bun": ">=1.4.4"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./handler": {
+      "types": "./dist/handler.d.ts",
+      "import": "./dist/handler.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "bun test test",
+    "prepack": "pnpm build",
+    "example": "bun examples/http.ts"
+  },
+  "peerDependencies": {
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@openknot-ts/wire": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/health": "workspace:*",
+    "@trpc/server": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:",
+    "@types/node": "catalog:bun",
+    "@openknot-ts/behavior": "workspace:*"
+  }
+}

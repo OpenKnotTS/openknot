@@ -1,0 +1,34 @@
+{
+  "name": "@quick-start/app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "start": "node --env-file-if-exists=.env src/index.ts"
+  },
+  "dependencies": {
+    "@libsql/client": "catalog:",
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/drizzle-uow": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/knot-health": "workspace:*",
+    "@openknot-ts/knot-http-node": "workspace:*",
+    "@openknot-ts/tracing": "workspace:*",
+    "@openknot-ts/trpc-context": "workspace:*",
+    "@openknot-ts/trpc-knot-server-handler": "workspace:*",
+    "@openknot-ts/trpc-router": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@trpc/server": "catalog:",
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@trpc/client": "catalog:"
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "name": "@openknot-ts/cache",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenKnot's cache primitive: read-through, write-through and snapshot layers over consumer-owned native stores, coherent with Units of Work.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-capabilities/cache"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./layers": {
+      "types": "./dist/layers.d.ts",
+      "import": "./dist/layers.js"
+    },
+    "./result": {
+      "types": "./dist/result.d.ts",
+      "import": "./dist/result.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --expose-gc --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build",
+    "example": "node examples/memory.ts"
+  },
+  "devDependencies": {
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/tracing": "workspace:*"
+  },
+  "peerDependencies": {
+    "@openknot-ts/behavior": "workspace:^",
+    "@openknot-ts/wire": "workspace:^",
+    "@openknot-ts/health": "workspace:^",
+    "@openknot-ts/tracing": "workspace:^",
+    "@openknot-ts/flow": "workspace:^"
+  }
+}

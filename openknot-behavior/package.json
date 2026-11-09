@@ -1,0 +1,80 @@
+{
+  "name": "@openknot-ts/behavior",
+  "version": "0.1.0",
+  "description": "Functional models, operations and reader contracts with typed outcomes.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-behavior"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json",
+    "./wire": {
+      "types": "./dist/wire.d.ts",
+      "import": "./dist/wire.js"
+    },
+    "./internal/composable": {
+      "types": "./dist/internal/composable.d.ts",
+      "import": "./dist/internal/composable.js"
+    },
+    "./internal/declarable": {
+      "types": "./dist/internal/declarable.d.ts",
+      "import": "./dist/internal/declarable.js"
+    },
+    "./internal/bindable": {
+      "types": "./dist/internal/bindable.d.ts",
+      "import": "./dist/internal/bindable.js"
+    },
+    "./internal/resolved": {
+      "types": "./dist/internal/resolved.d.ts",
+      "import": "./dist/internal/resolved.js"
+    },
+    "./internal/executable": {
+      "types": "./dist/internal/executable.d.ts",
+      "import": "./dist/internal/executable.js"
+    },
+    "./internal/safety": {
+      "types": "./dist/internal/safety.d.ts",
+      "import": "./dist/internal/safety.js"
+    },
+    "./internal/managed": {
+      "types": "./dist/internal/managed.d.ts",
+      "import": "./dist/internal/managed.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "example": "node examples/roles.ts",
+    "prepack": "pnpm build",
+    "example:wire": "pnpm build && node examples/wired-roles.ts"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@openknot-ts/wire": "workspace:*",
+    "zod": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "peerDependencies": {
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "dependencies": {
+    "@standard-schema/spec": "catalog:"
+  }
+}

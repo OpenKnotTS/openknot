@@ -1,0 +1,17 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    // tRPC 11.22's Fastify adapter declarations use `ws.WebSocket` on @types/ws's ESM default export, which has no such
+    // member; checking third-party declarations here would fail on their mismatch, not on this package.
+    "skipLibCheck": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["test", "examples", "node_modules", "dist"]
+}

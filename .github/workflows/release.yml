@@ -1,0 +1,60 @@
+name: Release
+
+# Run from Actions → Release → Run workflow. All @openknot-ts packages are released with the same version.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version, such as 0.2.0 or 0.2.0-beta.1
+        required: true
+      tag:
+        description: npm dist-tag
+        type: choice
+        options: [latest, next]
+        default: latest
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: release
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      TAG: ${{ inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .tool-versions
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .tool-versions
+      - run: pnpm install --frozen-lockfile
+
+      - name: Set the version
+        run: pnpm -r --filter "@openknot-ts/*" exec npm version "$VERSION" --no-git-tag-version --allow-same-version
+
+      - run: pnpm check
+      - run: pnpm test
+
+      # Versions already on npm are skipped, so a failed release can be run again with the same version.
+      - name: Publish
+        run: pnpm -r --filter "@openknot-ts/*" publish --access public --tag "$TAG" --provenance --no-git-checks
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Commit and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git diff --quiet || git commit -am "Release v$VERSION"
+          git tag "v$VERSION"
+          git push --atomic origin HEAD "refs/tags/v$VERSION"

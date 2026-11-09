@@ -1,0 +1,55 @@
+{
+  "name": "@modular/container",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test test/*.test.ts",
+    "test:e2e": "node --expose-gc --test --test-isolation=none test/*.integration.ts",
+    "start": "node --env-file-if-exists=.env src/serve.ts"
+  },
+  "dependencies": {
+    "@modular/behavior": "workspace:*",
+    "@modular/channels": "workspace:*",
+    "@modular/flow": "workspace:*",
+    "@modular/io": "workspace:*",
+    "@modular/transport": "workspace:*",
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/knot-health": "workspace:*",
+    "@openknot-ts/knot-http-node": "workspace:*",
+    "@openknot-ts/trpc-context": "workspace:*",
+    "@openknot-ts/trpc-knot-server-handler": "workspace:*",
+    "@openknot-ts/trpc-router": "workspace:*",
+    "@openknot-ts/wire": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "@trpc/client": "catalog:",
+    "@openknot-ts/tracing": "workspace:*",
+    "@openknot-ts/cache": "workspace:*",
+    "@openknot-ts/drizzle-uow": "workspace:*",
+    "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/rabbitmq": "workspace:*",
+    "@openknot-ts/redis-client": "workspace:*",
+    "@types/pg": "catalog:",
+    "drizzle-orm": "catalog:",
+    "pg": "catalog:",
+    "redis": "catalog:",
+    "@openknot-ts/outbox": "workspace:*",
+    "@openknot-ts/drizzle-outbox": "workspace:*",
+    "@openknot-ts/postgres-client": "workspace:*",
+    "@openknot-ts/knot-rest": "workspace:*",
+    "@openknot-ts/knot-rest-http-node": "workspace:*",
+    "zod": "catalog:"
+  }
+}

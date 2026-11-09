@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "incremental": false,
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "skipLibCheck": false,
+    "types": ["node/web-globals/abortcontroller", "node/web-globals/events"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["test", "examples", "node_modules", "dist"]
+}

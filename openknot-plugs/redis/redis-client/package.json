@@ -1,0 +1,44 @@
+{
+  "name": "@openknot-ts/redis-client",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Redis client resources, connection watch and health check for OpenKnot applications, over node-redis.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/redis/redis-client"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "test:redis": "node --test --test-isolation=none test/redis.integration.ts",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "redis": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

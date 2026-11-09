@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "printWidth": 120,
+  "sortPackageJson": false,
+  "sortImports": {
+    "newlinesBetween": false,
+    "groups": ["unknown"],
+    "ignoreCase": true,
+    "sortSideEffects": false
+  },
+  "ignorePatterns": [".omo/**", "**/*.md"]
+}

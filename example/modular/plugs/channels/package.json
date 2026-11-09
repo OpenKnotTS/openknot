@@ -1,0 +1,28 @@
+{
+  "name": "@modular/channels",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@modular/behavior": "workspace:*",
+    "@modular/flow": "workspace:*",
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/tracing": "workspace:*",
+    "@openknot-ts/wire": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

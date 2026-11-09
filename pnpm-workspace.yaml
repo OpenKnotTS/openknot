@@ -1,0 +1,53 @@
+packages:
+  - openknot-wire
+  - openknot-behavior
+  - openknot-flow
+  - openknot
+  - openknot-capabilities/*
+  - openknot-plugs/rabbitmq
+  - openknot-plugs/*/*
+  - "!openknot-plugs/trpc/middleware"
+  - openknot-plugs/trpc/middleware/*
+  - example/quick-start
+  - example/modular/app/*
+  - example/modular/plugs/*
+  - example/modular/container
+
+autoInstallPeers: true
+
+catalog:
+  "@libsql/client": 0.18.0
+  "@opentelemetry/api": 1.10.0
+  "@opentelemetry/context-async-hooks": 3.0.0
+  "@opentelemetry/core": 3.0.0
+  "@opentelemetry/sdk-trace": 3.0.0
+  "@standard-schema/spec": 1.1.0
+  "@trpc/client": 11.22.1
+  "@trpc/server": 11.22.1
+  "@types/bun": 1.4.4
+  "@types/node": 24.19.2
+  "@types/pg": 8.23.1
+  "@types/ws": 8.18.2
+  drizzle-orm: 1.0.0-rc.5
+  fastify: 5.12.7
+  jose: 6.2.13
+  mysql2: 3.24.6
+  oxfmt: 0.76.0
+  oxlint: 1.91.0
+  pg: 8.23.1
+  rabbitmq-client: 5.0.5
+  redis: 6.3.1
+  typescript: 7.0.2
+  ws: 8.19.0
+  zod: 4.6.7
+
+# Bun types follow Bun's native Node compatibility declarations; Node hosts keep the Node 24 catalog.
+catalogs:
+  bun:
+    "@types/node": 26.6.6
+
+disallowWorkspaceCycles: true
+
+engineStrict: true
+
+linkWorkspacePackages: true

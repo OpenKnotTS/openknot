@@ -1,0 +1,59 @@
+{
+  "name": "@openknot-ts/core",
+  "version": "0.1.0",
+  "description": "The OpenKnot core in one package: Wire, Behavior and Flow.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./behavior": {
+      "types": "./dist/behavior/index.d.ts",
+      "import": "./dist/behavior/index.js"
+    },
+    "./behavior/wire": {
+      "types": "./dist/behavior/wire.d.ts",
+      "import": "./dist/behavior/wire.js"
+    },
+    "./flow": {
+      "types": "./dist/flow/index.d.ts",
+      "import": "./dist/flow/index.js"
+    },
+    "./flow/wire": {
+      "types": "./dist/flow/wire.d.ts",
+      "import": "./dist/flow/wire.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build"
+  },
+  "dependencies": {
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/wire": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "packageManager": "pnpm@10.20.0"
+}

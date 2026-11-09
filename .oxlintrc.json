@@ -1,0 +1,10 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": [".omo/**"],
+  "rules": {
+    "curly": ["error", "all"],
+    "no-else-return": "error",
+    "no-lonely-if": "error",
+    "typescript/consistent-type-imports": "error"
+  }
+}

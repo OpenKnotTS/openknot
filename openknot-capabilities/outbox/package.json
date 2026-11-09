@@ -1,0 +1,58 @@
+{
+  "name": "@openknot-ts/outbox",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "OpenKnot's transactional outbox: publications stored with their change and delivered after commit, at least once and in order per name.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-capabilities/outbox"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./health": {
+      "types": "./dist/health.d.ts",
+      "import": "./dist/health.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build"
+  },
+  "peerDependencies": {
+    "@openknot-ts/flow": "workspace:^",
+    "@openknot-ts/health": "workspace:^",
+    "@openknot-ts/tracing": "workspace:^",
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "peerDependenciesMeta": {
+    "@openknot-ts/health": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/tracing": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

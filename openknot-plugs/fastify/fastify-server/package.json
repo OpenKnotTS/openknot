@@ -1,0 +1,49 @@
+{
+  "name": "@openknot-ts/fastify-server",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Fastify server lifecycle, plugin selection and draining for OpenKnot applications.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/fastify/fastify-server"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build",
+    "example": "node examples/fastify.ts"
+  },
+  "peerDependencies": {
+    "@openknot-ts/wire": "workspace:^",
+    "fastify": ">=5 <6"
+  },
+  "dependencies": {
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@openknot-ts/knot-http-node": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "fastify": "catalog:",
+    "typescript": "catalog:"
+  }
+}

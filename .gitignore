@@ -1,0 +1,40 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.tmp-test/
+
+# Local environment and logs
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# Local agent state and instructions
+.omo/
+.agents/
+.agent/
+.claude/
+.codex/
+.opencode/
+.hindsight/
+.gemini/
+.cursor/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.cursorrules
+
+# Internal notes and planning, not part of the library
+ROADMAP.md
+roadmap.md
+roadmap/
+mock.txt
+docs/
+plans/
+plan/
+workflow.md
+
+# Keep the library's root CI and publishing workflows
+!/.github/workflows/

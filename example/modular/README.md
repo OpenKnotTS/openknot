@@ -70,13 +70,13 @@ The example uses the ready host and protocol modules; custom hosts with their ow
 | Log listener | [listeners.ts](app/flow/src/listeners.ts) |
 | State query | [queries.ts](app/flow/src/queries.ts) |
 | Writers, publishers and access contracts | [ports.ts](app/flow/src/ports.ts) |
-| Flow provision and public subpath exports | [index.ts](app/flow/src/index.ts), [package.json](app/flow/package.json) |
+| Public input ports and subpath exports | [index.ts](app/flow/src/index.ts), [package.json](app/flow/package.json) |
 | Actor type | [actor.ts](app/flow/src/actor.ts) |
 | Database, Unit of Work and health check | [database.ts](plugs/io/src/database.ts) |
 | Readers, writers and identity | [drizzle.ts](plugs/io/src/drizzle.ts) |
 | In-process event bus | [node-events.ts](plugs/channels/src/node-events.ts) |
 | tRPC router with a protected procedure | [router.ts](plugs/transport/src/trpc/router.ts), [transport index](plugs/transport/src/index.ts) |
-| Composition: layers, HTTP host, tRPC and health | [application.ts](container/src/application.ts) |
+| Composition: input ports, plugs, HTTP host, tRPC and health | [application.ts](container/src/application.ts) |
 | Entry point | [serve.ts](container/src/serve.ts) |
 
 ## How it works
@@ -85,7 +85,7 @@ The application is the same as the quick-start's; see its [How it works](../quic
 
 - **Public exports.** The Flow package exports its ports through subpaths (`@modular/flow/ports`, `/exposures`, `/listeners`); commands, queries and guards are not importable. Plugs import only those contracts.
 - **Independent builds.** Every package builds and typechecks on its own; the container consumes their emitted declarations.
-- **One composition root.** Only the container imports every layer and selects the HTTP host, tRPC handler and health probes.
+- **One composition root.** Only the container lists the input ports it exposes, from `@modular/flow`, and selects the plugs, HTTP host, tRPC handler and health probes.
 
 ## Focused examples
 

@@ -5,7 +5,7 @@ import { guardedReferences, snapshotGuardOptions } from "./guard.ts";
 import { integration } from "./internal/integration.ts";
 import type { PublishOptions } from "./publisher.ts";
 import type { Topic, TopicImplementation } from "./topic.ts";
-import { BindPort, DefinitionIntegrationMarker, hasMarker } from "@openknot-ts/wire/internal/marker";
+import { BindPort, DefinitionIntegrationMarker, hasMarker, InputMarker } from "@openknot-ts/wire/internal/marker";
 import type { NoRequirements } from "@openknot-ts/wire/internal/requirements";
 
 export const SubscriptionMarker = Symbol.for("@openknot-ts/flow/subscription");
@@ -13,6 +13,7 @@ export const SubscriptionBindingMarker = Symbol.for("@openknot-ts/flow/subscript
 
 export interface SubscriptionDefinition {
   readonly [SubscriptionMarker]: true;
+  readonly [InputMarker]: true;
   readonly kind: "topic" | "broadcast";
   readonly guards: Guards;
   readonly requirements: NoRequirements;
@@ -59,6 +60,7 @@ export function subscriptionDefinition(
   const requirements = Object.freeze({});
   const definition = Object.freeze({
     [SubscriptionMarker]: true as const,
+    [InputMarker]: true as const,
     kind,
     guards,
     requirements,

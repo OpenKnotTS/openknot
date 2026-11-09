@@ -12,7 +12,7 @@ import type { Composition } from "@openknot-ts/behavior/internal/composable";
 import { composable } from "@openknot-ts/behavior/internal/composable";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
 import { executable } from "@openknot-ts/behavior/internal/executable";
-import { DefinitionIntegrationMarker, hasMarker } from "@openknot-ts/wire/internal/marker";
+import { DefinitionIntegrationMarker, hasMarker, InputMarker } from "@openknot-ts/wire/internal/marker";
 import type { NoRequirements, RequirementsOptions } from "@openknot-ts/wire/internal/requirements";
 
 export type ExposureContext<R extends Requirements> = ResolvedRequirements<R> & {
@@ -148,7 +148,11 @@ function createExpose(options: GuardOptions<Guards | undefined>): ExposureDefini
     integration,
     references: guardedReferences,
     define: () => {
-      return { requirements: snapshotRequirements(port.requirements), ...snapshotGuardOptions(options) };
+      return {
+        requirements: snapshotRequirements(port.requirements),
+        ...snapshotGuardOptions(options),
+        [InputMarker]: true as const,
+      };
     },
   });
   return definition;

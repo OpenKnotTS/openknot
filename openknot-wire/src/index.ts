@@ -77,6 +77,9 @@ export { applicationStatus, defineApplication, override } from "./definition.ts"
 export type {
   ApplicationCheck,
   ApplicationDefinition,
+  ApplicationEntry,
+  ApplicationInput,
+  ApplicationInputGroup,
   ApplicationGives,
   ApplicationOptions,
   ApplicationRoots,

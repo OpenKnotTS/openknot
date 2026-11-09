@@ -19,7 +19,7 @@ pnpm --filter @openknot-ts/flow exec node examples/role-data.ts
 | Kind | Primitives | Notes |
 | --- | --- | --- |
 | Handlers | `command`, `query` | Internal; called through `requirements`. |
-| Inputs | `expose`, `listener`, `scheduler`, `topic`, `broadcast` | What `provideFlow()` publishes. Plugs and transports invoke them. |
+| Inputs | `expose`, `listener`, `scheduler`, `topic`, `broadcast` | An application's `inputs`. Plugs and transports invoke them. |
 | Outputs | `reader` (from Behavior), `writer`, `publisher` | Implemented by plugs. |
 | Policies | `guard`, `hook`, `unitOfWork` | Internal dependencies. |
 
@@ -272,6 +272,17 @@ const delivery = plug({
 - **Tracing.** Flow consumes `optional(trace)` from [`@openknot-ts/tracing`](../openknot-capabilities/tracing/README.md). Every input, handler, guard, hook, Unit of Work, publication and subscription admission becomes a span named `openknot.<kind>`; listener deliveries and scheduler ticks are roots. Requests carry a `propagation` carrier (`PropagationCarrier`) and `traceAttributes`; native bindings receive the implementation as `invoke.tracing` and `PublishOptions.tracing`. Add [`provideOpenTelemetry()`](../openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), or bind `trace` yourself. Native plugs trace their own operations with `withTrace()` from `@openknot-ts/tracing`.
 
 ## Provision
+
+An application lists its input ports, or their compositions, in `defineApplication({ inputs })`; everything they need is followed through requirements:
+
+```ts
+const application = defineApplication({
+  inputs: [roleApi, onRoleChanged],
+  modules: [roleStorage, roleEventsBus, http],
+});
+```
+
+A package can also publish its ports as a ready module:
 
 ```ts
 import { provideFlow } from "@openknot-ts/flow/wire";

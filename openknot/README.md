@@ -20,7 +20,6 @@ pnpm add @openknot-ts/knot-http-node @openknot-ts/trpc-router @openknot-ts/trpc-
 ```ts
 import { model, operation, success } from "@openknot-ts/core/behavior";
 import { command, expose } from "@openknot-ts/core/flow";
-import { provideFlow } from "@openknot-ts/core/flow/wire";
 import { defineApplication, runApplication } from "@openknot-ts/core";
 ```
 

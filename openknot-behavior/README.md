@@ -182,7 +182,7 @@ export const behavior = provideBehavior([roleOperations]);
 
 - Sources are operations, `operation.compose({ renameRole, deactivateRole })` groups, native Wire `unit()`s, namespaces and import loaders with literal specifiers, such as `() => import("./role.operations.ts")`. Models, readers, resources and plugs are rejected.
 - Readers and private child operations join through `requirements`; operations may require only readers and operations.
-- Applications list the module in `defineApplication({ modules })`; `includeOnly`, `exclude`, `when` and `requiredBy` select from it.
+- Operations need no module of their own in an application: its `inputs` reach them through requirements. A provided module can still be listed in `defineApplication({ modules })`, where `includeOnly`, `exclude`, `when` and `requiredBy` select from it.
 - Operations and readers are scoped: resolve them inside `app.withScope(work, { root: operation })`, which acquires only what that operation can reach. Missing implementations fail at `runApplication()`.
 
 ```ts

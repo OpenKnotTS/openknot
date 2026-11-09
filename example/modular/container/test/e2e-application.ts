@@ -1,8 +1,7 @@
-import { behavior } from "@modular/behavior";
 import type { LogEvent, RoleEvent } from "@modular/behavior/events";
 import type { RoleState } from "@modular/behavior/models/role";
 import { listRoles, listLogs } from "@modular/behavior/readers";
-import { flow } from "@modular/flow";
+import { createRoleExposure, getStateExposure } from "@modular/flow";
 import { roleChangedListener } from "@modular/flow/listeners";
 import { logPublisher, rolePublisher, saveLogWriter, saveRoleWriter, userHasAccessToRole } from "@modular/flow/ports";
 import { accessConfig, identity } from "@modular/io";
@@ -13,7 +12,6 @@ import type { CacheChange } from "@openknot-ts/cache";
 import { cache } from "@openknot-ts/cache";
 import { drizzleUnitOfWork } from "@openknot-ts/drizzle-uow";
 import { defaultUnitOfWork, listener, upserted, writer } from "@openknot-ts/flow";
-import { provideFlow } from "@openknot-ts/flow/wire";
 import { healthCheck } from "@openknot-ts/health";
 import { healthHttp } from "@openknot-ts/knot-health";
 import { http } from "@openknot-ts/knot-http-node";
@@ -322,14 +320,12 @@ export const roleRejected = observer<RoleEvent>();
 export function application(env: Readonly<Record<string, string>> = {}) {
   return runApplication(
     defineApplication({
+      inputs: [createRoleExposure, getStateExposure, roleChangedListener, logCreated.port, roleRejected.port],
       modules: [
-        behavior,
-        flow,
         transport,
         http,
         trpcHttp,
         healthHttp,
-        provideFlow([logCreated.port, roleRejected.port]),
         providePlugs([database, transaction, databaseHealth, identity, storage, roleCache, redisHealth]),
         providePlugs([rabbitConnection, rabbitHealthCheck()]),
         providePlugs([

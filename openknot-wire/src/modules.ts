@@ -1,6 +1,6 @@
 import type { Decoration } from "./decorations.ts";
 import type { EntriesGraph, GivesOf, GivesOfGraph, Graph, RootsOfGraph, SourceEntries } from "./graph.ts";
-import { hasMarker } from "./internal/marker.ts";
+import { GroupMarker, hasMarker } from "./internal/marker.ts";
 import type { CollectionContract, Definition, Provider, Resolved } from "./providers.ts";
 import { isProvider, ProviderMarker } from "./providers.ts";
 
@@ -276,9 +276,7 @@ export function composeModule<D extends object>(definition: ModuleDefinition | S
     }
   }
 
-  const roots: Definition[] = definitions
-    .filter((provider) => isProvider(provider) && (provider.kind === "unit" || provider.kind === "collection"))
-    .map((provider) => provider as Definition);
+  const roots: Definition[] = activationRoots(definitions);
 
   const implicitRoots = definitions.map((provider) => provider as Definition);
 
@@ -300,6 +298,33 @@ export function composeModule<D extends object>(definition: ModuleDefinition | S
   }
 
   return moduleSelection(definitions, roots, excluded, implicitRoots, names);
+}
+
+/** Units and collections are activation roots; every other listed definition is a root its integration may start. */
+function activationRoots(definitions: readonly object[]): Definition[] {
+  return definitions
+    .filter((provider) => isProvider(provider) && (provider.kind === "unit" || provider.kind === "collection"))
+    .map((provider) => provider as Definition);
+}
+
+/** Definitions an application lists directly, as one module; a group, such as a port composition, lists its members. */
+export function listedModule(entries: readonly object[], label: string): ModuleSelection {
+  const definitions = entries.flatMap((entry) => {
+    if (typeof entry !== "object" || entry === null || Array.isArray(entry)) {
+      throw new TypeError(`${label} expects modules or definitions.`);
+    }
+
+    return hasMarker(entry, GroupMarker)
+      ? Object.values((entry as { readonly members: Readonly<Record<string, object>> }).members)
+      : [entry];
+  });
+
+  return moduleSelection(definitions, activationRoots(definitions), [], definitions as readonly Definition[]);
+}
+
+/** Whether a value is a module, immediate or deferred, rather than a definition. */
+export function isModuleInput(value: unknown): value is ModuleInput {
+  return isModuleSelection(value) || isDeferredModule(value);
 }
 
 /** Select activation roots; all available definitions can still be dependencies. */

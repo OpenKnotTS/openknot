@@ -1,5 +1,5 @@
-import { behavior } from "../app/behavior/index.ts";
-import { flow } from "../app/flow/index.ts";
+import { createRoleExposure, getStateExposure } from "../app/flow/exposures.ts";
+import { roleChangedListener } from "../app/flow/listeners.ts";
 import { channels } from "../plugs/channels/index.ts";
 import { io } from "../plugs/io/index.ts";
 import { transport } from "../plugs/transport/index.ts";
@@ -9,10 +9,11 @@ import { trpcHttp } from "@openknot-ts/trpc-knot-server-handler";
 import { defineApplication } from "@openknot-ts/wire";
 
 export const application = defineApplication({
+  // The application's input ports; what they need is followed through their requirements
+  inputs: [createRoleExposure, getStateExposure, roleChangedListener],
+
   modules: [
-    // The application and its plugs
-    behavior,
-    flow,
+    // The implementations the application selects
     io,
     channels,
     transport,

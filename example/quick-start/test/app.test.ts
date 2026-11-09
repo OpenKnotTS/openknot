@@ -1,10 +1,8 @@
 import type { RoleEvent, LogEvent } from "../src/app/behavior/events.ts";
-import { behavior } from "../src/app/behavior/index.ts";
 import { Log } from "../src/app/behavior/models/log.ts";
 import { Role } from "../src/app/behavior/models/role.ts";
 import { createRoleOp, createLogFromRoleOp } from "../src/app/behavior/operations.ts";
 import { createRoleExposure } from "../src/app/flow/exposures.ts";
-import { flow } from "../src/app/flow/index.ts";
 import { roleChangedListener } from "../src/app/flow/listeners.ts";
 import { saveLogWriter, saveRoleWriter, userHasAccessToRole } from "../src/app/flow/ports.ts";
 import { application } from "../src/container/application.ts";
@@ -124,11 +122,8 @@ test("native persistence writers return upsert results for inserts and updates",
 test("the log listener saves and publishes LogCreated in a partial composition", async () => {
   const app = await runApplication(
     defineApplication({
-      modules: [
-        behavior,
-        flow.includeOnly([roleChangedListener]),
-        composeModule({ modules: [io], providers: { logPublishing } }),
-      ],
+      inputs: [roleChangedListener],
+      modules: [composeModule({ modules: [io], providers: { logPublishing } })],
     }),
     { env: testEnv },
   );
@@ -450,9 +445,8 @@ test("the application log command publishes after native commit and after-commit
   });
   const app = await runApplication(
     defineApplication({
+      inputs: [roleChangedListener],
       modules: [
-        behavior,
-        flow.includeOnly([roleChangedListener]),
         composeModule({
           modules: [io.exclude([storage.unitOfWork])],
           providers: {

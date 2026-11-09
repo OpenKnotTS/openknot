@@ -8,7 +8,7 @@ import type { FlowResolved } from "./internal/resolved.ts";
 import type { Outcome, SuccessOf } from "@openknot-ts/behavior";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
 import { executable } from "@openknot-ts/behavior/internal/executable";
-import { hasMarker } from "@openknot-ts/wire/internal/marker";
+import { hasMarker, InputMarker } from "@openknot-ts/wire/internal/marker";
 import type { NoRequirements, RequirementsOptions } from "@openknot-ts/wire/internal/requirements";
 import { snapshotRequirements as snapshotReferences } from "@openknot-ts/wire/internal/requirements";
 
@@ -69,6 +69,7 @@ export type InputResult<Output = unknown> = Outcome<Output, Error> | PromiseLike
 
 export interface InputPortDefinition {
   readonly [InputPortMarker]: true;
+  readonly [InputMarker]: true;
   readonly kind: "scheduler" | "listener" | "expose";
   readonly requirements: Requirements;
   readonly [InputRun]: (input: never, ctx: never) => InputResult;
@@ -222,7 +223,7 @@ export function scheduler(options: ScheduleOptions): InputPortDefinition {
         throw new TypeError("Unknown overlap policy");
       }
       const requirements = snapshotRequirements(port.requirements);
-      return { requirements, schedule: snapshotSchedule(options.schedule), overlap };
+      return { requirements, schedule: snapshotSchedule(options.schedule), overlap, [InputMarker]: true as const };
     },
   });
 
@@ -260,7 +261,7 @@ function createListener(options: object): InputPortDefinition {
     run: port.run as InputPortDefinition[typeof InputRun],
     invalidRunMessage: "A listener requires run() or handler",
     integration,
-    define: () => ({ requirements: snapshotRequirements(port.requirements) }),
+    define: () => ({ requirements: snapshotRequirements(port.requirements), [InputMarker]: true as const }),
   });
 
   return definition;

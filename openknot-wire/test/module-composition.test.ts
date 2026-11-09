@@ -1,6 +1,7 @@
 import type { Definition } from "../src/index.ts";
 import {
   runApplication,
+  collect,
   composeModule,
   defineApplication,
   isProvider,
@@ -248,4 +249,36 @@ test("invalid selector roots fail before any lifecycle resources are acquired", 
     /outside/,
   );
   assert.equal(acquired, 0);
+});
+
+test("definitions listed directly join the application in module order, and only input ports are inputs", async () => {
+  const names = collect.contract<string>();
+  const first = unit({ provides: names, factory: () => "first" });
+  const second = unit({ provides: names, factory: () => "second" });
+  const third = unit({ provides: names, factory: () => "third" });
+  const listed = unit({ requirements: { names }, factory: ({ names }) => names.join(",") });
+  const app = await runApplication(
+    defineApplication({ modules: [first, composeModule({ providers: { second } }), third, listed] }),
+  );
+  try {
+    assert.equal(app.resolve(listed), "first,second,third");
+  } finally {
+    await app.stop();
+  }
+
+  assert.throws(
+    () =>
+      defineApplication({
+        // @ts-expect-error A unit is not an input port; layers mark their own.
+        inputs: [listed],
+      }),
+    /accepts input ports, such as exposures and listeners, not a unit/,
+  );
+
+  for (const [options, message] of [
+    [{ modules: [42] }, /expects modules or definitions/],
+    [{ inputs: [null] }, /accepts input ports/],
+  ] as const) {
+    assert.throws(() => Reflect.apply(defineApplication, undefined, [options]), message);
+  }
 });

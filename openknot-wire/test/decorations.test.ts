@@ -137,7 +137,7 @@ test("the root modules decide which decorations apply and in what order", async 
   const base = composeModule({ providers: { value } });
   const one = composeModule({ providers: { first } });
   const two = providePlugs([second]);
-  const cases: readonly [ApplicationOptions["modules"], string][] = [
+  const cases: readonly [NonNullable<ApplicationOptions["modules"]>, string][] = [
     [[base, one, two], "second(first(value))"],
     [[base, two, one], "first(second(value))"],
     [[base, one.when(false), two], "second(value)"],

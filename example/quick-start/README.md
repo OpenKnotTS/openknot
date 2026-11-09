@@ -59,19 +59,18 @@ The example uses the ready host and protocol modules; custom hosts with their ow
 | Log listener | [listeners.ts](src/app/flow/listeners.ts) |
 | State query | [queries.ts](src/app/flow/queries.ts) |
 | Writers, publishers and access contracts | [ports.ts](src/app/flow/ports.ts) |
-| Flow provision (ports only) | [index.ts](src/app/flow/index.ts) |
 | Actor type | [actor.ts](src/app/flow/actor.ts) |
 | Database, Unit of Work and health check | [database.ts](src/plugs/io/database.ts) |
 | Readers, writers and identity | [drizzle.ts](src/plugs/io/drizzle.ts) |
 | In-process event bus | [node-events.ts](src/plugs/channels/node-events.ts) |
 | tRPC router with a protected procedure | [router.ts](src/plugs/transport/trpc/router.ts), [transport index](src/plugs/transport/index.ts) |
-| Composition: layers, HTTP host, tRPC and health | [application.ts](src/container/application.ts) |
+| Composition: input ports, plugs, HTTP host, tRPC and health | [application.ts](src/container/application.ts) |
 | Entry point | [index.ts](src/index.ts) |
 
 ## How it works
 
 - **Behavior is pure.** Models validate through their schemas; operations return `{ output: created(state), events }`.
-- **Flow states the policy.** Commands persist, then publish. The exposure runs its guard first. Commands, queries and guards stay internal; the Flow index provides only ports.
+- **Flow states the policy.** Commands persist, then publish. The exposure runs its guard first. Commands, queries and guards stay internal. The container lists the input ports in `inputs`; operations, handlers and contracts follow from their requirements.
 - **Unit of Work.** The IO plug binds `defaultUnitOfWork` to [`@openknot-ts/drizzle-uow`](../../openknot-plugs/drizzle/drizzle-uow/README.md): a command's first database call opens its SQLite transaction, which its readers and writers share. Writers return `upserted(row)` from Drizzle `returning()`. Publications wait for the commit; a failure before it rolls back and discards them.
 - **Events behave like a broker.** The publisher returns once the event is emitted; the listener runs on its own with its own transaction and reports its own failures. Only serialized trace context travels with each event.
 - **tRPC.** `trpcRouter({ requirements, routes })` receives exposures as native resolvers, as in `.mutation(createRoleExposure)`. The container selects `http` and `trpcHttp`; nothing constructs a server by hand.

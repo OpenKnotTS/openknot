@@ -1,9 +1,12 @@
+import { GroupMarker } from "@openknot-ts/wire/internal/marker";
+
 /** Shared grouping metadata; members keep their own contracts and identities. */
 export type Composition<
   Marker extends symbol,
   Kind extends string,
   Members extends Readonly<Record<string, unknown>>,
 > = Readonly<Record<Marker, true>> & {
+  readonly [GroupMarker]: true;
   readonly kind: Kind;
   readonly members: Readonly<Members>;
 };
@@ -11,7 +14,7 @@ export type Composition<
 /**
  * Add homogeneous composition to a primitive's factory without wrapping its
  * call signature. In particular, generic factories keep their type inference.
- * This module has no runtime dependencies and is shared across framework layers.
+ * This module loads only Wire's marker helpers and is shared across framework layers.
  */
 export function composable<
   Member,
@@ -61,6 +64,8 @@ export function composable<
 
     return Object.freeze({
       ...metadata?.(values),
+      // An application that lists the composition lists its members.
+      [GroupMarker]: true as const,
       [marker]: true as const,
       kind,
       members: frozen,

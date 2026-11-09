@@ -74,7 +74,22 @@ const together = composeModule({ modules: [repositories, roles] });
 
 Units, collections and listed resources are roots by default. Definitions reached through requirements need no module. Views are immutable, and a module is materialized once per application.
 
-Layers publish modules with `provideBehavior()`, `provideFlow()` and `providePlugs()`; applications list them in `defineApplication({ modules })`. Leave module exports inferred: an annotation such as `: ProvidedFlow` erases the graph that compile-time checks read.
+### Applications
+
+An application names its input ports and the implementations it selects:
+
+```ts
+const application = defineApplication({
+  inputs: [roleApi, onRoleChanged],
+  modules: [roleStorage, eventBus, http],
+});
+```
+
+- `inputs` are the application's roots: ports such as exposures and listeners, or their compositions (`expose.compose({ ... })`), whose members are listed. What they need is followed through requirements. Only input ports are accepted: a handler, guard or plug listed there fails to compile and is rejected by `defineApplication()`, since layers mark their input ports with Wire's input marker.
+- `modules` lists modules, or definitions directly: plugs, resources, units, decorations. Their order is the module order, which orders collection members and intake.
+- Implementations are never found by scanning: an application selects them, so two applications, or a test, can choose different ones.
+
+Packages can still publish ready modules with `provideBehavior()`, `provideFlow()` and `providePlugs()`. Leave module exports inferred: an annotation such as `: ProvidedFlow` erases the graph that compile-time checks read.
 
 ## Contracts and bindings
 
@@ -184,10 +199,11 @@ await app.stopped;
 
 The `Application` has `resolve(reference)`, `withScope(work, options?)`, `stop()`, `stopped`, `ready` and `status`.
 
-`defineApplication({ modules, startupTasks?, shutdownTasks?, resourceOrder? })` selects hooks for each phase and resources that must open first:
+`defineApplication({ inputs?, modules?, startupTasks?, shutdownTasks?, resourceOrder? })` also selects hooks for each phase and resources that must open first:
 
 ```ts
 const application = defineApplication({
+  inputs: [roleApi],
   modules: [observability, io, channels],
   startupTasks: [warmCache],
   shutdownTasks: [recordShutdown],
@@ -264,7 +280,7 @@ Scoped values are shared within the callback and released after it, even on fail
 The compiler also reports missing implementations at `runApplication()`, derived from the final graph:
 
 ```
-runApplication(defineApplication({ modules: [behavior, flow, io, transport] }));
+runApplication(defineApplication({ inputs: [roleApi], modules: [io, transport] }));
 // … required in type '{ readonly missingImplementations: "logPublisher" | "rolePublisher"; }'
 ```
 

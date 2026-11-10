@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/drizzle-versioning",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "type": "module",
   "description": "Native Drizzle implementation of the OpenKnot versioning contract over a consumer-owned session.",
   "license": "MIT",

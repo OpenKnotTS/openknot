@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-http-bun",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "type": "module",
   "description": "Native Bun HTTP server lifecycle and draining for OpenKnot applications.",
   "license": "MIT",

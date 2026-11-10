@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-rest",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "type": "module",
   "description": "REST routes over OpenKnot exposures, independent of the HTTP host.",
   "license": "MIT",

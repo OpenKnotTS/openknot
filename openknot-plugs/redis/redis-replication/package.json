@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/redis-replication",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "type": "module",
   "description": "Redis implementation of the OpenKnot replica store and replication channel over consumer-owned clients.",
   "license": "MIT",

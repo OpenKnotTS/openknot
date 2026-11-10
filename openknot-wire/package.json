@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/wire",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "description": "Functional dependency injection, typed reference composition and application lifecycle.",
   "type": "module",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/postgres-client",
-  "version": "0.1.0",
+  "version": "0.0.2-preview",
   "type": "module",
   "description": "PostgreSQL pool resource and health check for OpenKnot applications, over node-postgres.",
   "license": "MIT",

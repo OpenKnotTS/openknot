@@ -29,7 +29,7 @@ export interface RedisConnections {
   readonly subscriber: RedisSubscriber;
 }
 
-export type RedisManagedClient = Pick<RedisClientType, "close" | "destroy"> & {
+export type RedisManagedClient = Pick<RedisClientType, "close" | "destroy" | "isReady"> & {
   connect(...args: Parameters<RedisClientType["connect"]>): Promise<unknown>;
   on(...args: Parameters<RedisClientType["on"]>): void;
   off(...args: Parameters<RedisClientType["off"]>): void;
@@ -87,6 +87,28 @@ async function connected(client: RedisManagedClient): Promise<void> {
   }
 }
 
+/**
+ * Closes a client for release: a ready client first receives the replies to the commands it already sent. node-redis
+ * settles `close()` only on a reply or on `destroy()`, so a client that is not ready, which no reply can reach, is
+ * destroyed at once, and a connection that fails while closing ends the wait with its error.
+ */
+async function closed(client: RedisManagedClient): Promise<void> {
+  try {
+    if (client.isReady) {
+      const failed = Promise.withResolvers<never>();
+      const fail = (error: unknown) => failed.reject(error);
+      client.on("error", fail);
+      try {
+        await Promise.race([client.close(), failed.promise]);
+      } finally {
+        client.off("error", fail);
+      }
+    }
+  } finally {
+    client.destroy();
+  }
+}
+
 export function redisClient<const R extends Requirements = {}, C extends RedisConnections = RedisConnections>(
   options: RequirementsOptions<R> & {
     readonly create: (
@@ -139,15 +161,7 @@ export function redisClient<const R extends Requirements = {}, C extends RedisCo
       return {
         value: Object.assign(clients, { connection }),
         async release() {
-          const results = await Promise.allSettled(
-            native.map(async (client) => {
-              try {
-                await client.close();
-              } finally {
-                client.destroy();
-              }
-            }),
-          );
+          const results = await Promise.allSettled(native.map(closed));
 
           const failures = results.flatMap((result) =>
             result.status === "rejected" ? [result.reason as unknown] : [],

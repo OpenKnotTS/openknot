@@ -14,6 +14,7 @@ function clients(log: string[], fail = false) {
     async sendCommand(_arguments: string[]) {
       return "OK";
     },
+    isReady: true,
     async connect() {
       log.push("commands:connect");
     },
@@ -34,6 +35,7 @@ function clients(log: string[], fail = false) {
     emit: emitter.emit.bind(emitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    isReady: true,
     async connect() {
       log.push("subscriber:connect");
       if (fail) {
@@ -111,6 +113,38 @@ test("an already cancelled acquisition releases clients that the native factory 
   assert.ok(log.includes("subscriber:destroy"));
 });
 
+test("release destroys a client that is not ready, and a connection that fails while closing ends its close", async () => {
+  const log: string[] = [];
+  const native = clients(log);
+  // As node-redis does: close() settles only on a reply or on destroy(), and neither client receives a reply here.
+  native.commands.isReady = false;
+  native.commands.close = () => {
+    log.push("commands:close");
+    return new Promise<void>(() => undefined);
+  };
+  const lost = new Error("Socket timeout");
+  native.subscriber.close = () => {
+    log.push("subscriber:close");
+    queueMicrotask(() => native.subscriber.emit("error", lost));
+    return new Promise<void>(() => undefined);
+  };
+  const redis = redisClient({ create: () => native });
+  const app = await runApplication(defineApplication({ modules: [composeModule({ providers: { redis } })] }));
+  await assert.rejects(
+    app.stop(),
+    (error) =>
+      error instanceof AggregateError &&
+      error.errors.some((released) => released instanceof AggregateError && released.errors.includes(lost)),
+  );
+  assert.deepEqual(log, [
+    "commands:connect",
+    "subscriber:connect",
+    "commands:destroy",
+    "subscriber:close",
+    "subscriber:destroy",
+  ]);
+});
+
 test("connection reports lost once and restored on ready", async () => {
   const log: string[] = [];
   const emitter = new EventEmitter();
@@ -118,6 +152,7 @@ test("connection reports lost once and restored on ready", async () => {
     async sendCommand(_arguments: string[]) {
       return "OK";
     },
+    isReady: true,
     async connect() {
       log.push("commands:connect");
     },
@@ -137,6 +172,7 @@ test("connection reports lost once and restored on ready", async () => {
     off: subscriberEmitter.off.bind(subscriberEmitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    isReady: true,
     async connect() {
       log.push("subscriber:connect");
     },
@@ -200,6 +236,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
     async sendCommand(_arguments: string[]) {
       return "OK";
     },
+    isReady: true,
     async connect() {
       log.push("commands:connect");
     },
@@ -219,6 +256,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
     off: subscriberEmitter.off.bind(subscriberEmitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    isReady: true,
     async connect() {
       log.push("subscriber:connect");
     },

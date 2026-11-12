@@ -26,7 +26,7 @@ const redis = redisClient({
 ## Lifecycle
 
 - Both clients connect at acquisition. A client's first error before it is ready fails startup; once ready, its native reconnection applies.
-- A failed or cancelled startup destroys both; release closes each once.
+- A failed or cancelled startup destroys both. Release closes each once: a ready client first receives the replies to the commands it already sent, a client that is not ready is destroyed at once, and a connection that fails while closing ends the release with its error.
 - node-redis's command `timeout` only covers sending. Set `socket.socketTimeout` with `pingInterval` so a server that stops answering cannot hold a command, or the application's stop.
 - Consumers share the resource through `requirements`; cache adapters never close it.
 

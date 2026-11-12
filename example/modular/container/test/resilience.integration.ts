@@ -300,31 +300,39 @@ test(
 test(
   "stopping while Redis or RabbitMQ is down still closes every connection",
   { skip: outages, timeout: 120_000 },
-  async () => {
+  async (t) => {
     // node-redis does not cancel a reconnection delay it already scheduled when destroyed; that timer ends by itself.
     const sockets = async () => (await activeResources()).filter((resource) => resource !== "Timeout");
-    try {
-      for (const container of [containers.redis, containers.rabbitmq]) {
-        const before = await sockets();
-        const app = await application();
-        await docker(["stop", container]);
-        // A release that cannot reach its server reports that failure; it still ends its connection.
-        await app.stop().catch(() => undefined);
-        assert.deepEqual(await sockets(), before, container);
-        await docker(["start", container]);
-        if (container === containers.redis) {
-          // Its default strategy reconnects until the restarted server answers.
-          const native = createRedisClient({ url: REDIS_URL! });
-          await native.connect();
-          native.destroy();
-        }
+    /** Resolves once the restarted Redis answers: the native client's default strategy reconnects until then. */
+    const redisAnswers = async () => {
+      // Each refusal while the server starts is the wait itself, not a failure.
+      const native = createRedisClient({ url: REDIS_URL! }).on("error", () => undefined);
+      await native.connect();
+      native.destroy();
+    };
+    // The runner awaits this after a failure or a timeout too, so the tests that follow find both services answering.
+    t.after(
+      async () => {
+        await docker(["start", containers.redis, containers.rabbitmq]);
+        await redisAnswers();
+        // The broker answers once it has restarted; the application's startup waits for it.
+        const app = await application({ RABBITMQ_STARTUP_TIMEOUT_MS: "60000" });
+        await app.stop();
+      },
+      { timeout: 60_000 },
+    );
+    for (const container of [containers.redis, containers.rabbitmq]) {
+      const before = await sockets();
+      const app = await application();
+      await docker(["stop", container]);
+      // A release that cannot reach its server reports that failure; it still ends its connection.
+      await app.stop().catch(() => undefined);
+      assert.deepEqual(await sockets(), before, container);
+      await docker(["start", container]);
+      if (container === containers.redis) {
+        await redisAnswers();
       }
-    } finally {
-      await docker(["start", containers.redis, containers.rabbitmq]);
     }
-    // The broker answers once it has restarted; the application's startup waits for it.
-    const app = await application({ RABBITMQ_STARTUP_TIMEOUT_MS: "60000" });
-    await app.stop();
   },
 );
 

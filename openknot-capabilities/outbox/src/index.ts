@@ -1,6 +1,5 @@
-import type { ErrorReporter } from "@openknot-ts/error-reporting";
-import { reportError } from "@openknot-ts/error-reporting";
-import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type { Publish, Publisher } from "@openknot-ts/flow";
 import { isPublisher } from "@openknot-ts/flow";
 import { transactional, unitOfWorkChanges } from "@openknot-ts/flow/wire";
@@ -108,7 +107,7 @@ const reserved = [
   "outboxStore",
   "outboxTracing",
   "outboxLogger",
-  "outboxReporter",
+  "outboxFailures",
   "outboxDispatchers",
   "outboxConnection",
 ];
@@ -170,7 +169,7 @@ export function outbox<M, R extends Requirements, C extends Requirement = never>
       outboxStore,
       outboxTracing: optional(trace),
       outboxLogger: logger,
-      outboxReporter: optional(errorReporter),
+      outboxFailures: unattendedFailures,
       outboxDispatchers: dispatchers,
       ...(connection === undefined ? {} : { outboxConnection: connection }),
     } as Requirements,
@@ -179,7 +178,7 @@ export function outbox<M, R extends Requirements, C extends Requirement = never>
         outboxStore: store,
         outboxTracing: tracing,
         outboxLogger: log,
-        outboxReporter: reporter,
+        outboxFailures: failures,
         outboxDispatchers: registry,
         outboxConnection: watched,
         ...requirements
@@ -187,7 +186,7 @@ export function outbox<M, R extends Requirements, C extends Requirement = never>
         readonly outboxStore: OutboxStore;
         readonly outboxTracing: Tracing | undefined;
         readonly outboxLogger: Logger;
-        readonly outboxReporter: ErrorReporter | undefined;
+        readonly outboxFailures: UnattendedFailures;
         readonly outboxDispatchers: Dispatchers;
         readonly outboxConnection?: ConnectionWatch;
       };
@@ -237,7 +236,11 @@ export function outbox<M, R extends Requirements, C extends Requirement = never>
                 }),
               );
             } catch (error) {
-              log.warn("outbox send failed", { name, recordId: record.id, error });
+              log.warn("openknot.outbox send failed", {
+                "openknot.outbox.name": name,
+                "openknot.outbox.record.id": record.id,
+                error,
+              });
               await store.attempted(record.id, owner, describe(error));
               await store.release(
                 records.slice(index + 1).map((each) => each.id),
@@ -277,15 +280,9 @@ export function outbox<M, R extends Requirements, C extends Requirement = never>
             await drain();
           } while (again && !stopping);
         })
-          .catch((error: unknown) => {
-            log.error("outbox delivery failed", { name, error });
-            reportError(reporter, {
-              error,
-              source: "openknot.outbox",
-              expected: false,
-              attributes: { "openknot.outbox.name": name },
-            });
-          })
+          .catch((error: unknown) =>
+            failures({ error, source: "openknot.outbox", attributes: { "openknot.outbox.name": name } }),
+          )
           .finally(() => {
             running = undefined;
           });

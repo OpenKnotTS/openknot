@@ -37,14 +37,19 @@
   },
   "devDependencies": {
     "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   },
   "peerDependencies": {
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
   },
   "peerDependenciesMeta": {
+    "@openknot-ts/logging": {
+      "optional": true
+    },
     "@openknot-ts/wire": {
       "optional": true
     }

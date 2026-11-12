@@ -1,6 +1,10 @@
 import type { ErrorReport } from "../src/index.ts";
 import { isReported, reportError } from "../src/index.ts";
+import { errorReporter, unattendedFailures } from "../src/wire.ts";
 import { error } from "@openknot-ts/behavior";
+import type { LogRecord } from "@openknot-ts/logging";
+import { logging } from "@openknot-ts/logging/wire";
+import { composeModule, defineApplication, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -33,4 +37,48 @@ test("a failing reporter never fails the work that reports", (t) => {
       report(new Error("crash"), false),
     ),
   );
+});
+
+test("an unattended failure is always logged, and reported as unexpected once a reporter is bound", async () => {
+  const failure = new Error("connection lost");
+  const attributes = { "openknot.cache.name": "roles" };
+  const run = async (withReporter: boolean) => {
+    const records: LogRecord[] = [];
+    const reports: ErrorReport[] = [];
+    const recorded = unit({
+      provides: logging,
+      factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+    });
+    const reporter = unit({ provides: errorReporter, factory: () => (each: ErrorReport) => void reports.push(each) });
+    const app = await runApplication(
+      defineApplication({
+        modules: [
+          composeModule({
+            providers: withReporter
+              ? { failures: unattendedFailures, recorded, reporter }
+              : { failures: unattendedFailures, recorded },
+          }),
+        ],
+      }),
+      { env: {} },
+    );
+    try {
+      app.resolve(unattendedFailures)({ error: failure, source: "openknot.cache", attributes });
+    } finally {
+      await app.stop();
+    }
+    return { records, reports };
+  };
+  const logged = [["error", "openknot.cache failed", { ...attributes, error: failure }]];
+  const alone = await run(false);
+  assert.deepEqual(
+    alone.records.map((record) => [record.level, record.message, record.attributes]),
+    logged,
+  );
+  const reported = await run(true);
+  assert.deepEqual(
+    reported.records.map((record) => [record.level, record.message, record.attributes]),
+    logged,
+  );
+  assert.deepEqual(reported.reports, [{ error: failure, source: "openknot.cache", expected: false, attributes }]);
 });

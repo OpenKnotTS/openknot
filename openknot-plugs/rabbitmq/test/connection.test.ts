@@ -87,7 +87,7 @@ test("by default a connection failure is written through the logger and reported
     records.map(({ level, message, attributes }) => [level, message, attributes.error]),
     reports.map(({ error, source, expected }) => {
       assert.deepEqual([source, expected], ["openknot.rabbitmq", false]);
-      return ["error", "RabbitMQ failure", error];
+      return ["error", "openknot.rabbitmq failed", error];
     }),
   );
 });

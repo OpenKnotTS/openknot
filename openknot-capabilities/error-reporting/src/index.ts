@@ -21,6 +21,11 @@ export interface ErrorReport {
 
 export type ErrorReporter = (report: ErrorReport) => void;
 
+/** A failure no caller receives: where it failed, and what identifies the failing instance. */
+export type UnattendedFailure = Pick<ErrorReport, "error" | "source" | "attributes">;
+
+export type UnattendedFailures = (failure: UnattendedFailure) => void;
+
 /** Every unexpected failure, and the expected ones that `errors` selects. */
 export function isReported(report: ErrorReport, errors: readonly ErrorKind[] = []): boolean {
   return !report.expected || errors.some((kind) => kind.is(report.error));

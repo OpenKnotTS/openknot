@@ -5,9 +5,8 @@ import type { CacheChange, CacheOrder, CacheMemberReads, CacheResult, PortEntity
 import type { LayerStop } from "@openknot-ts/cache/layers";
 import { isAsyncIterable, keyOf, layered, layerStartup, storeWaits } from "@openknot-ts/cache/layers";
 import { asCacheResult } from "@openknot-ts/cache/result";
-import type { ErrorReporter } from "@openknot-ts/error-reporting";
-import { reportError } from "@openknot-ts/error-reporting";
-import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type { CommittedChange, EntityKey, UnitOfWorkChanges } from "@openknot-ts/flow/wire";
 import { unitOfWorkChanges } from "@openknot-ts/flow/wire";
 import type { HealthCheckDefinition } from "@openknot-ts/health";
@@ -493,7 +492,7 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
     channel: ReplicationChannel,
     locks: Lock,
     tracing: Tracing | undefined,
-    reporter: ErrorReporter | undefined,
+    failures: UnattendedFailures,
     dependencies: ResolvedReferences<Requirements>,
   ): Replica {
     const origin = randomUUID();
@@ -560,12 +559,11 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
       }
 
       reported = true;
-      // Reported inside the failure's span, so a reporter links it to the trace.
+      // Logged and reported inside the failure's span, so both link it to the trace.
       void withTrace(tracing, { name: `${namespace} replication failed`, failure: () => error }, async () =>
-        reportError(reporter, {
+        failures({
           error,
           source: "openknot.replication",
-          expected: false,
           attributes: { "openknot.replication.namespace": namespace },
         }),
       );
@@ -1349,7 +1347,7 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
       __channel: replicationChannel,
       __lock: lock,
       __trace: optional(trace),
-      __reporter: optional(errorReporter),
+      __failures: unattendedFailures,
     } as Requirements,
     factory: ({
       __changes,
@@ -1357,7 +1355,7 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
       __channel,
       __lock,
       __trace,
-      __reporter,
+      __failures,
       ...dependencies
     }: Record<string, unknown>) =>
       createReplica(
@@ -1366,7 +1364,7 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
         __channel as ReplicationChannel,
         __lock as Lock,
         __trace as Tracing | undefined,
-        __reporter as ErrorReporter | undefined,
+        __failures as UnattendedFailures,
         dependencies as ResolvedReferences<Requirements>,
       ),
   });

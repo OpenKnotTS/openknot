@@ -93,7 +93,7 @@ test("a handler or middleware that fails answers 500 without its private headers
     }
     assert.deepEqual(
       reported.mock.calls.map((call) => [String(call.arguments[0]).replace(/^\S+ /, ""), call.arguments[1]]),
-      Array.from({ length: 3 }, () => ["ERROR HTTP request handler failed", { error: failure }]),
+      Array.from({ length: 3 }, () => ["ERROR openknot.http failed", { error: failure }]),
     );
     assert.deepEqual(
       reports.map((report) => [report.error, report.source, report.expected]),

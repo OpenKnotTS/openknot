@@ -39,7 +39,7 @@ test("a failing handler answers 500 and is logged and reported once", async () =
     }
     assert.deepEqual(
       records.map((record) => [record.level, record.message, record.attributes.error]),
-      Array.from({ length: 2 }, () => ["error", "HTTP request handler failed", failure]),
+      Array.from({ length: 2 }, () => ["error", "openknot.http failed", failure]),
     );
     assert.deepEqual(
       reports.map((report) => [report.error, report.source, report.expected]),

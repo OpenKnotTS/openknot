@@ -1,10 +1,7 @@
 import type { HttpMiddleware } from "./handler.ts";
 import { httpHandler, httpMiddleware } from "./handler.ts";
-import type { ErrorReporter } from "@openknot-ts/error-reporting";
-import { reportError } from "@openknot-ts/error-reporting";
-import { errorReporter } from "@openknot-ts/error-reporting/wire";
-import type { Logger } from "@openknot-ts/logging";
-import { logger } from "@openknot-ts/logging/wire";
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type {
   CancellationOptions,
   ManagedResource,
@@ -14,9 +11,8 @@ import type {
   Resolved,
   ResolvedReferences,
   ResourceHandle,
-  OptionalDependency,
 } from "@openknot-ts/wire";
-import { config, optional, providePlugs, resource } from "@openknot-ts/wire";
+import { config, providePlugs, resource } from "@openknot-ts/wire";
 import { captureRejectionSymbol, once } from "node:events";
 import type { RequestListener, Server, ServerOptions, ServerResponse } from "node:http";
 import { createServer } from "node:http";
@@ -74,8 +70,7 @@ type ServerRequirements<
 > = R & {
   readonly handler: H;
   readonly middleware: typeof httpMiddleware;
-  readonly __logger: typeof logger;
-  readonly __reporter: OptionalDependency<typeof errorReporter>;
+  readonly __failures: typeof unattendedFailures;
 } & (Default extends true ? { readonly __httpConfig: typeof httpConfig } : {});
 
 export type NodeHttpServer<
@@ -95,8 +90,7 @@ async function listenNodeHttpServer(
   options: ServerOptions,
   address: ListenOptions,
   middleware: readonly HttpMiddleware[],
-  log: Logger,
-  reporter: ErrorReporter | undefined,
+  failures: UnattendedFailures,
   { signal }: CancellationOptions,
 ): Promise<ResourceHandle<HttpServer>> {
   const dispatch = middleware.reduceRight<RequestListener>(
@@ -127,8 +121,7 @@ async function listenNodeHttpServer(
 
       // Answers as Node's own rejection capture does, which an application would otherwise have to enable process-wide.
       const failed = (error: unknown) => {
-        log.error("HTTP request handler failed", { error });
-        reportError(reporter, { error, source: "openknot.http", expected: false });
+        failures({ error, source: "openknot.http" });
         server[captureRejectionSymbol]?.(error as Error, "request", request, response);
       };
 
@@ -251,8 +244,7 @@ export function nodeHttpServer<
     ...declared,
     handler,
     middleware: httpMiddleware,
-    __logger: logger,
-    __reporter: optional(errorReporter),
+    __failures: unattendedFailures,
   } as ServerRequirements<H, R, boolean>;
   return resource({
     requirements,
@@ -261,8 +253,7 @@ export function nodeHttpServer<
         readonly handler: RequestListener;
         readonly middleware: readonly HttpMiddleware[];
         readonly __httpConfig: Resolved<typeof httpConfig>;
-        readonly __logger: Logger;
-        readonly __reporter: ErrorReporter | undefined;
+        readonly __failures: UnattendedFailures;
       };
       const settings = listen === undefined ? values.__httpConfig : undefined;
       const address =
@@ -274,8 +265,7 @@ export function nodeHttpServer<
         selectedOptions,
         address,
         values.middleware,
-        values.__logger,
-        values.__reporter,
+        values.__failures,
         acquisition,
       );
     },

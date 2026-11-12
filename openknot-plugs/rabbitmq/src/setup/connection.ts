@@ -1,8 +1,6 @@
 import type { ErrorReport } from "@openknot-ts/error-reporting";
-import { reportError } from "@openknot-ts/error-reporting";
-import { errorReporter } from "@openknot-ts/error-reporting/wire";
-import { logger } from "@openknot-ts/logging/wire";
-import { config, optional, resource, unit } from "@openknot-ts/wire";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
+import { config, resource, unit } from "@openknot-ts/wire";
 import type { CancellationOptions, Requirements, RequirementsOptions, ResolvedReferences } from "@openknot-ts/wire";
 import { Connection } from "rabbitmq-client";
 import { z } from "zod";
@@ -23,18 +21,15 @@ export type RabbitErrors = (error: unknown, attributes?: ErrorReport["attributes
 
 /**
  * Receives the failures the integration cannot return to a caller: connection errors, topology recovery and listener
- * deliveries that never reached Flow. By default each is written through the application's `logger` and reported to
- * its error reporter when one is bound; bind it with `unit({ provides: rabbitErrors, factory })` to handle them
- * elsewhere.
+ * deliveries that never reached Flow. By default each goes to the application's `unattendedFailures`, which logs and
+ * reports it; bind it with `unit({ provides: rabbitErrors, factory })` to handle them elsewhere.
  */
 export const rabbitErrors = unit({
-  requirements: { logger, reporter: optional(errorReporter) },
+  requirements: { failures: unattendedFailures },
   factory:
-    ({ logger, reporter }): RabbitErrors =>
-    (error, attributes) => {
-      logger.error("RabbitMQ failure", { ...attributes, error });
-      reportError(reporter, { error, source: "openknot.rabbitmq", expected: false, attributes });
-    },
+    ({ failures }): RabbitErrors =>
+    (error, attributes) =>
+      failures({ error, source: "openknot.rabbitmq", attributes }),
 });
 
 /** Owns the native connection returned by create, including every SDK option and inferred custom member. */

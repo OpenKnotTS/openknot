@@ -486,6 +486,9 @@ importers:
       '@openknot-ts/health':
         specifier: workspace:*
         version: link:../health
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@openknot-ts/tracing':
         specifier: workspace:*
         version: link:../tracing
@@ -504,6 +507,9 @@ importers:
       '@openknot-ts/behavior':
         specifier: workspace:*
         version: link:../../openknot-behavior
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../openknot-wire
@@ -603,6 +609,9 @@ importers:
       '@openknot-ts/lock':
         specifier: workspace:*
         version: link:../lock
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../logging
       '@openknot-ts/tracing':
         specifier: workspace:*
         version: link:../tracing

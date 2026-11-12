@@ -4,9 +4,8 @@ import { asCacheResult } from "./result.ts";
 import type { ReaderComposition, ReaderDefinition, ReaderFunction } from "@openknot-ts/behavior";
 import { isReader, isReaderComposition } from "@openknot-ts/behavior";
 import { managedIdentity, isList, itemsOf, versionOf } from "@openknot-ts/behavior/internal/managed";
-import type { ErrorReporter } from "@openknot-ts/error-reporting";
-import { reportError } from "@openknot-ts/error-reporting";
-import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type { CommittedChange, EntityKey, UnitOfWorkChanges } from "@openknot-ts/flow/wire";
 import { unitOfWorkChanges } from "@openknot-ts/flow/wire";
 import type { HealthCheckDefinition } from "@openknot-ts/health";
@@ -305,7 +304,7 @@ export function cache<const P extends ReaderDefinition | ReaderComposition, cons
     context: UnitOfWorkChanges,
     dependencies: Dependencies<R>,
     tracing: Tracing | undefined,
-    reporter: ErrorReporter | undefined,
+    failures: UnattendedFailures,
     flights: Map<string, Set<Map<string, Promise<unknown>>>>,
   ): Layer {
     const persist = options.persist(dependencies);
@@ -356,12 +355,11 @@ export function cache<const P extends ReaderDefinition | ReaderComposition, cons
         }
         layer.failure = error;
         layer.unavailable = true;
-        // Reported inside the outage's span, so a reporter links it to the trace.
+        // Logged and reported inside the outage's span, so both link it to the trace.
         void withTrace(tracing, { name: `${name} unavailable`, failure: () => error }, async () =>
-          reportError(reporter, {
+          failures({
             error,
             source: "openknot.cache",
-            expected: false,
             attributes: { "openknot.cache.name": name },
           }),
         );
@@ -604,18 +602,18 @@ export function cache<const P extends ReaderDefinition | ReaderComposition, cons
       ...options.requirements,
       __changes: unitOfWorkChanges,
       __trace: optional(trace),
-      __reporter: optional(errorReporter),
+      __failures: unattendedFailures,
       __flights: entityFlights,
     } as Requirements,
 
     initialize: async (dependencies: Readonly<Record<string, unknown>>) => {
-      const { __changes, __trace, __reporter, __flights, ...deps } = dependencies as {
+      const { __changes, __trace, __failures, __flights, ...deps } = dependencies as {
         readonly __changes: UnitOfWorkChanges;
         readonly __trace: Tracing | undefined;
-        readonly __reporter: ErrorReporter | undefined;
+        readonly __failures: UnattendedFailures;
         readonly __flights: Map<string, Set<Map<string, Promise<unknown>>>>;
       } & Record<string, unknown>;
-      const layer = create(__changes, deps as Dependencies<R>, __trace, __reporter, __flights);
+      const layer = create(__changes, deps as Dependencies<R>, __trace, __failures, __flights);
 
       let unsubscribe: (() => void) | undefined;
 

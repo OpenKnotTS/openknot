@@ -35,7 +35,7 @@ const createRole = command<CreateRole>()({
 - `LOG_LEVEL` (`trace`, `debug`, `info`, `warn`, `error` or `fatal`, the levels pino and OpenTelemetry share; `info` by default) is read at `runApplication()`; any other value stops startup. The console writes `trace` with `console.debug` and `fatal` with `console.error`.
 - With a [tracing](../tracing/README.md) implementation bound, such as [`provideOpenTelemetry()`](../../openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), every written record carries the active span's `traceId` and `spanId`, as Spring Sleuth adds them to the MDC. Records outside a span carry neither, records filtered by their level never ask, and nothing changes without tracing.
 - Logging never fails the work that logs: a record the implementation cannot write is reported on the console with the implementation's error.
-- Flow also logs its own executions per kind, such as `LOG_LEVEL_COMMAND=debug` with `LOG_DURATION=true`: see [execution logs](../../openknot-flow/README.md#actors-tracing-and-logging).
+- Flow also logs its own executions per kind. No failure is silent by default: exposures and subscriptions write their defects, listeners and schedulers every failure; other kinds are set like `LOG_LEVEL_COMMAND=debug` with `LOG_DURATION=true`: see [execution logs](../../openknot-flow/README.md#actors-tracing-and-logging).
 - Behavior operations may require `logger` beside readers and operations. `standalone()` uses the console logger unless `override(logger, value)` supplies one.
 
 ## Implement and bind

@@ -33,6 +33,7 @@ export function createAdapterRuntime() {
     const { tracing, logs } = uow;
     return {
       tracing,
+      logs,
       get status(): string {
         return context.status;
       },

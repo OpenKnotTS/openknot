@@ -14,6 +14,8 @@ import { isExposure } from "../exposure.ts";
 import type { ExecutionLifetime } from "./cancellation.ts";
 import { executionLifetime } from "./cancellation.ts";
 import { addCheckpoints, portKeys } from "./checkpoint.ts";
+import type { ExecutionLogs } from "./execution-logs.ts";
+import { logRefusal } from "./execution-logs.ts";
 import type { ExecutionEnvironment } from "./execution-runtime.ts";
 import type { RuntimeGuard } from "./guard-execution.ts";
 import { guardAdmission } from "./guard-execution.ts";
@@ -38,6 +40,7 @@ export interface InputHost {
   /** Aborts once the application begins stopping. */
   readonly stopping: AbortSignal;
   readonly tracing?: Tracing | undefined;
+  readonly logs?: ExecutionLogs | undefined;
   /**
    * `root` is the port the scope executes: it acquires only the scoped resources that port may need. `bounded`
    * declares that `signal` aborts once the scope's execution completes, so that execution adopts it.
@@ -88,23 +91,28 @@ function deliveryTrigger(trigger: object | undefined): ListenerTrigger {
   };
 }
 
+/** An input's own invoker, which can also refuse a request for the source that binds it. */
+export type RuntimeEndpoint = RuntimeInvoke & { readonly refuse: (error: Error) => Promise<never> };
+
 /** Holds only definition metadata and an application-local scope capability. */
-export function createInputInvoker(port: InputPortDefinition, host: InputHost): RuntimeInvoke {
+export function createInputInvoker(port: InputPortDefinition, host: InputHost): RuntimeEndpoint {
   // Startup validation has checked these references; their entries and the port's guards are fixed per port.
   const requirements = Object.entries(port.requirements);
   const admit = isExposure(port) ? guardAdmission(port.guards) : undefined;
   const skipsOverlap = port.kind === "scheduler" && "overlap" in port && port.overlap === "skip";
   const ports = portKeys(port.requirements);
+  const operation = { kind: port.kind, reference: port };
 
   let active = 0;
 
   const execute = async (request: InputRequest): Promise<Outcome<unknown, Error> | SkippedInvocation> => {
     let lifetime: ExecutionLifetime | undefined;
     let admitted = false;
+    let observed = false;
     let signal: AbortSignal | undefined;
     let completed: Outcome<unknown, Error> | undefined;
     try {
-      return await protectAsync(
+      const result = await protectAsync(
         async () => {
           // A stopping application still admits what its hosts and sources drain, until its intake has closed.
           if (host.status !== "starting" && host.status !== "ready" && !host.intakeOpen) {
@@ -159,6 +167,8 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
           const guards = admit?.(fields);
           const executionSignal = signal;
 
+          // From here the execution's own record covers the outcome.
+          observed = true;
           return await host.withScope(
             async (scope) => {
               // The execution's signal follows the invocation's; guards, port calls and run() share it.
@@ -210,12 +220,17 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
               root: port,
               bounded: true,
             },
-            { kind: port.kind, reference: port },
+            operation,
           );
         },
         // Once the execution has settled, only its scope's cleanup can still fail.
         (error) => (completed === undefined ? executionError(error, signal) : cleanupError(completed, error)),
       );
+      // A request refused before its execution ran has no record of its own.
+      if (!observed && "isError" in result && result.isError) {
+        logRefusal(host.logs, operation, result.error);
+      }
+      return result;
     } finally {
       if (admitted) {
         active--;
@@ -225,13 +240,22 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
     }
   };
 
-  // The execution stays an Outcome inside Flow; the plug that invokes it receives a value or an exception.
-  const invoke = async (request: InputRequest): Promise<unknown> => {
-    const result = await execute(request);
-    return "isError" in result ? requireSuccess(result) : result;
+  // Every rejection is logged before it is returned, so a source that does not await an invocation cannot leave it
+  // unhandled; one that awaits still receives it.
+  const handled = <T>(pending: Promise<T>): Promise<T> => {
+    pending.catch(() => undefined);
+    return pending;
+  };
+  const refuse = (error: Error): Promise<never> => {
+    logRefusal(host.logs, operation, error);
+    return handled(Promise.reject(error));
   };
 
-  return Object.freeze(Object.assign(invoke, { tracing: host.tracing }));
+  // The execution stays an Outcome inside Flow; the plug that invokes it receives a value or an exception.
+  const invoke = (request: InputRequest): Promise<unknown> =>
+    handled(execute(request).then((result) => ("isError" in result ? requireSuccess(result) : result)));
+
+  return Object.freeze(Object.assign(invoke, { tracing: host.tracing, refuse }));
 }
 
 /**
@@ -241,7 +265,7 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
 export async function bindInputSource(
   definition: PlugDefinition & { readonly port: InputPortDefinition },
   dependencies: object,
-  endpoint: RuntimeInvoke,
+  endpoint: RuntimeEndpoint,
   startup: AbortSignal,
 ): Promise<{ readonly value: undefined; release(): Promise<void> }> {
   const source = new AbortController();
@@ -252,7 +276,7 @@ export async function bindInputSource(
 
   const invokeFromSource: RuntimeInvoke = Object.freeze(
     Object.assign(
-      (request: InputRequest) => (signal.aborted ? Promise.reject(InputUnavailableError()) : endpoint(request)),
+      (request: InputRequest) => (signal.aborted ? endpoint.refuse(InputUnavailableError()) : endpoint(request)),
       { tracing: endpoint.tracing },
     ),
   );

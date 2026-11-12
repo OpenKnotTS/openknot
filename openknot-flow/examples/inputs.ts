@@ -27,7 +27,8 @@ const timerEngine = unit({
 
         const scheduledAt = next;
         next += period;
-        void options.onTick(scheduledAt).catch(console.error);
+        // Flow logs every failure of the scheduler, so a tick is not awaited here.
+        void options.onTick(scheduledAt);
       }, period);
 
       return {

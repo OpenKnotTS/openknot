@@ -1,14 +1,34 @@
 import { createExecutionLogs } from "../execution-logs.ts";
 import type { LogLevel } from "@openknot-ts/logging";
-import { parseLogLevel } from "@openknot-ts/logging";
+import { isLogLevel } from "@openknot-ts/logging";
 import { logging } from "@openknot-ts/logging/wire";
 import { trace } from "@openknot-ts/tracing/wire";
 import { config, optional, unit } from "@openknot-ts/wire";
 
-/** An unset or empty variable leaves its kind unlogged. */
-function level(value: string | undefined): LogLevel | undefined {
-  return value === undefined || value.trim() === "" ? undefined : parseLogLevel(value);
+/** An unset or empty variable keeps its kind's default; `off` leaves the kind unlogged. */
+function level(fallback: LogLevel | undefined) {
+  return (value: string | undefined): LogLevel | undefined => {
+    const configured = value?.trim().toLowerCase();
+    if (configured === undefined || configured === "") {
+      return fallback;
+    }
+    if (configured === "off") {
+      return undefined;
+    }
+    if (!isLogLevel(configured)) {
+      throw new TypeError("Expected off, trace, debug, info, warn, error or fatal.");
+    }
+    return configured;
+  };
 }
+
+/**
+ * Every execution starts at an input, so no failure stays silent: an exposure or subscription returns its failures to
+ * a caller, whose transport reports a defect without logging it; a listener or scheduler has no caller at all.
+ */
+const called = level("error");
+const unattended = level("warn");
+const nested = level(undefined);
 
 function flag(value: string | undefined): boolean {
   switch (value?.trim().toLowerCase()) {
@@ -24,16 +44,16 @@ function flag(value: string | undefined): boolean {
 }
 
 export const executionLoggingConfig = config({
-  LOG_LEVEL_EXPOSE: level,
-  LOG_LEVEL_LISTENER: level,
-  LOG_LEVEL_SCHEDULER: level,
-  LOG_LEVEL_COMMAND: level,
-  LOG_LEVEL_QUERY: level,
-  LOG_LEVEL_GUARD: level,
-  LOG_LEVEL_HOOK: level,
-  LOG_LEVEL_UNIT_OF_WORK: level,
-  LOG_LEVEL_PUBLISH: level,
-  LOG_LEVEL_SUBSCRIBE: level,
+  LOG_LEVEL_EXPOSE: called,
+  LOG_LEVEL_SUBSCRIBE: called,
+  LOG_LEVEL_LISTENER: unattended,
+  LOG_LEVEL_SCHEDULER: unattended,
+  LOG_LEVEL_COMMAND: nested,
+  LOG_LEVEL_QUERY: nested,
+  LOG_LEVEL_GUARD: nested,
+  LOG_LEVEL_HOOK: nested,
+  LOG_LEVEL_UNIT_OF_WORK: nested,
+  LOG_LEVEL_PUBLISH: nested,
   LOG_DURATION: flag,
 });
 

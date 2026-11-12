@@ -243,9 +243,9 @@ test("a listener failure stays with the listener: the role is created and the lo
   });
   try {
     assert.deepEqual(await client(app.resolve(httpServer).url).createRole.mutate(input), input);
-    const [message, error] = await reported.promise;
-    assert.equal(message, "RoleChanged listener failed");
-    assert.ok(InternalFlowError.is(error));
+    const [message, attributes] = await reported.promise;
+    assert.match(String(message), / ERROR listener failed$/, "Flow logs the listener's defect by default.");
+    assert.ok(InternalFlowError.is((attributes as { readonly error: unknown }).error));
     assert.deepEqual(
       await app.resolve(database).select().from(roles),
       [input],

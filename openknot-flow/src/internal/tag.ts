@@ -13,7 +13,7 @@ export function snapshotTag(options: TagOptions): TagOptions {
   if (typeof tag !== "string" || tag.trim().length === 0) {
     throw new TypeError("tag must be a non-empty string");
   }
-  
+
   return { tag };
 }
 

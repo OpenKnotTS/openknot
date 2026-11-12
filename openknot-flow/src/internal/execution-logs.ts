@@ -1,4 +1,4 @@
-import { InternalFlowError } from "../errors.ts";
+import { InputUnavailableError, InternalFlowError } from "../errors.ts";
 import { tagOf } from "./tag.ts";
 import type { ExecutionTrace, ExecutionTraceKind } from "./tracing.ts";
 import { outcomeError, traceExecution } from "./tracing.ts";
@@ -43,6 +43,17 @@ function internal(error: unknown): boolean {
   return InternalFlowError.is(error) || InternalBehaviorError.is(error);
 }
 
+/** A record names its operation by kind and tag, as `command role.rename`, and carries both as attributes. */
+function identify(operation: Pick<ExecutionTrace, "kind" | "reference">): {
+  readonly name: string;
+  readonly identity: LogAttributes;
+} {
+  const tag = tagOf(operation.reference);
+  return tag === undefined
+    ? { name: operation.kind, identity: { kind: operation.kind } }
+    : { name: `${operation.kind} ${tag}`, identity: { kind: operation.kind, tag } };
+}
+
 /**
  * Started at debug, succeeded at info, a returned failure at warn with its type, a defect at error with the error
  * itself. Inputs, outputs and actors are never written.
@@ -53,9 +64,7 @@ async function logExecution<T>(
   operation: Pick<ExecutionTrace, "kind" | "reference">,
   work: () => Promise<T>,
 ): Promise<T> {
-  const tag = tagOf(operation.reference);
-  const name = tag === undefined ? operation.kind : `${operation.kind} ${tag}`;
-  const identity: LogAttributes = tag === undefined ? { kind: operation.kind } : { kind: operation.kind, tag };
+  const { name, identity } = identify(operation);
   const started = duration ? performance.now() : 0;
   const completed = (attributes: LogAttributes): LogAttributes =>
     duration
@@ -73,15 +82,40 @@ async function logExecution<T>(
   }
 
   const failure = outcomeError(result);
-
   if (failure === undefined) {
     logger.info(`${name} succeeded`, completed({}));
-  } else if (internal(failure)) {
-    logger.error(`${name} failed`, completed({ errorType: errorType(failure), error: failure }));
   } else {
-    logger.warn(`${name} failed`, completed({ errorType: errorType(failure) }));
+    logFailure(logger, `${name} failed`, completed, failure);
   }
   return result;
+}
+
+function logFailure(
+  logger: Logger,
+  message: string,
+  attributes: (added: LogAttributes) => LogAttributes,
+  failure: unknown,
+): void {
+  if (internal(failure)) {
+    logger.error(message, attributes({ errorType: errorType(failure), error: failure }));
+  } else {
+    logger.warn(message, attributes({ errorType: errorType(failure) }));
+  }
+}
+
+/** A request an input refused before any execution ran, which no execution record or span covers. */
+export function logRefusal(
+  logs: ExecutionLogs | undefined,
+  operation: Pick<ExecutionTrace, "kind" | "reference">,
+  error: unknown,
+): void {
+  const logger = logs?.loggers[operation.kind];
+  if (logger === undefined) {
+    return;
+  }
+  const { name, identity } = identify(operation);
+  const attributes = (added: LogAttributes): LogAttributes => ({ ...identity, ...added });
+  logFailure(logger, InputUnavailableError.is(error) ? `${name} not admitted` : `${name} failed`, attributes, error);
 }
 
 /** Every traced execution passes here: the log records it inside its span, so implementations can correlate them. */
@@ -96,6 +130,6 @@ export function observeExecution<T>(
   if (logs === undefined || logger === undefined) {
     return traceExecution(tracing, operation, work);
   }
-  
+
   return traceExecution(tracing, operation, () => logExecution(logger, logs.duration, operation, work));
 }

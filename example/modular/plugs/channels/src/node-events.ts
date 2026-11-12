@@ -33,17 +33,14 @@ export const logPublishing = plug({
     },
 });
 
-// The publisher does not wait for consumers; the listener reports its own failures.
+// The publisher does not wait for consumers. Flow logs every failure of the listener, including a delivery it does
+// not admit, and the in-process bus has no redelivery, so a delivery is not awaited here.
 export const roleEvents = plug({
   port: roleChangedListener,
   requirements: { eventBus },
   bind: ({ eventBus, invoke }) => {
-    const receive = async (input: RoleEvent, propagation?: PropagationCarrier) => {
-      try {
-        await invoke({ input, propagation });
-      } catch (error) {
-        console.error("RoleChanged listener failed", error);
-      }
+    const receive = (input: RoleEvent, propagation?: PropagationCarrier) => {
+      void invoke({ input, propagation });
     };
 
     eventBus.on("roleChanged", receive);

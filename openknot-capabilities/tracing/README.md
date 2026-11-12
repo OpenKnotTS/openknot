@@ -4,7 +4,7 @@
 
 ```text
 Flow, plugs (where)        → TraceSpan { name, kind?, root?, propagation?, attributes?, reference?, failure? }
-@openknot-ts/tracing (API)    → Tracing { run, capture, bind, propagationFields }
+@openknot-ts/tracing (API)    → Tracing { run, capture, bind, propagationFields, correlation? }
 implementation (plug)      → native spans, IDs, sampling, propagation format and export
 ```
 
@@ -15,7 +15,7 @@ implementation (plug)      → native spans, IDs, sampling, propagation format a
 
 ## Instrument
 
-`withTrace(tracing, span, work)` runs `work` inside a span, or directly when no implementation is bound. Instrumentation never fails business work: the work runs exactly once and keeps its own result or rejection, even when the implementation throws, skips or repeats it. `capturePropagation(tracing)` and `bindTrace(tracing, work)` apply the same rule to carrier capture and to deferred work: a bound work runs once, also when its binding fails as it is called. `propagationFields(tracing)` names the carrier fields a transport selects: the implementation's own, or W3C Trace Context (`traceparent`, `tracestate`).
+`withTrace(tracing, span, work)` runs `work` inside a span, or directly when no implementation is bound. Instrumentation never fails business work: the work runs exactly once and keeps its own result or rejection, even when the implementation throws, skips or repeats it. `capturePropagation(tracing)` and `bindTrace(tracing, work)` apply the same rule to carrier capture and to deferred work: a bound work runs once, also when its binding fails as it is called. `propagationFields(tracing)` names the carrier fields a transport selects: the implementation's own, or W3C Trace Context (`traceparent`, `tracestate`). `traceCorrelation(tracing)` returns the active span's `{ traceId, spanId }` from the optional `correlation()`, also for a span that is not sampled, or `undefined` outside a span or when the implementation has none or fails; [`@openknot-ts/logging`](../logging/README.md) adds them to every log record.
 
 ```ts
 import { capturePropagation, withTrace } from "@openknot-ts/tracing";

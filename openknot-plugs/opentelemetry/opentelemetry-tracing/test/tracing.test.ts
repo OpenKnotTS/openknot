@@ -467,3 +467,18 @@ test("input spans include native Wire scope initialization and release failures"
     await otel.release();
   }
 });
+
+test("correlation names the active span, and nothing outside a recorded one", async () => {
+  const otel = telemetry();
+  try {
+    assert.equal(otel.tracing.correlation?.(), undefined);
+    let inside: unknown;
+    await otel.tracing.run({ name: "work" }, async () => {
+      inside = otel.tracing.correlation?.();
+    });
+    const span = otel.exporter.getFinishedSpans().at(-1)!;
+    assert.deepEqual(inside, { traceId: span.spanContext().traceId, spanId: span.spanContext().spanId });
+  } finally {
+    await otel.release();
+  }
+});

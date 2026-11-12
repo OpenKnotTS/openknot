@@ -1,4 +1,10 @@
-import type { PropagationCarrier, TraceSpan, SpanKind as TraceSpanKind, Tracing } from "@openknot-ts/tracing";
+import type {
+  PropagationCarrier,
+  TraceCorrelation,
+  TraceSpan,
+  SpanKind as TraceSpanKind,
+  Tracing,
+} from "@openknot-ts/tracing";
 import type {
   Attributes,
   ContextManager,
@@ -170,6 +176,17 @@ export function openTelemetryTracing(options: OpenTelemetryTracingOptions): Trac
         if (span !== undefined) {
           safely(() => span!.end());
         }
+      }
+    },
+    correlation(): TraceCorrelation | undefined {
+      try {
+        const active = trace.getSpanContext(context.active());
+        return active === undefined || !isSpanContextValid(active)
+          ? undefined
+          : Object.freeze({ traceId: active.traceId, spanId: active.spanId });
+      } catch (error) {
+        report(error);
+        return undefined;
       }
     },
     capture(): PropagationCarrier | undefined {

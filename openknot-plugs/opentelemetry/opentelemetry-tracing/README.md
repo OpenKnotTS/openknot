@@ -73,6 +73,7 @@ const observability = provideOpenTelemetry({
 - An active span from native instrumentation, such as an HTTP server span, stays the parent. Scheduler ticks start new traces.
 - Staged publications and after-commit effects keep the context they were staged in; rollback creates no delivery span.
 - Instrumentation failures never change the business result, and work runs once.
+- `correlation()` returns the active span's `traceId` and `spanId` from the same context, so [`@openknot-ts/logging`](../../../openknot-capabilities/logging/README.md) records join their traces.
 
 Propagation travels as an immutable carrier separate from input and actor; plugs carry only the propagator's `propagationFields`. Transports add `traceAttributes`: RabbitMQ adds the messaging system, destination, routing key, operation and message id. RabbitMQ spans follow the [messaging](https://opentelemetry.io/docs/specs/semconv/messaging/messaging-spans/) and [RabbitMQ](https://opentelemetry.io/docs/specs/semconv/messaging/rabbitmq/) semantic conventions.
 

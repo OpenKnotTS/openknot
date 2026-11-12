@@ -1,4 +1,4 @@
-import { bindTrace, capturePropagation, withTrace } from "../src/index.ts";
+import { bindTrace, capturePropagation, traceCorrelation, withTrace } from "../src/index.ts";
 import type { Tracing } from "../src/index.ts";
 import { trace } from "../src/wire.ts";
 import { composeModule, defineApplication, optional, runApplication, unit } from "@openknot-ts/wire";
@@ -80,6 +80,20 @@ test("capture and bind failures fall back to no carrier and the original work", 
   assert.equal(capturePropagation(undefined), undefined);
   assert.equal(await bindTrace(broken, work)(), 1);
   assert.equal(bindTrace(undefined, work), work);
+});
+
+test("correlation is read from the implementation, and is absent when it has none or fails", () => {
+  const ids = { traceId: "4bf92f3577b34da6a3ce929d0e0e4736", spanId: "00f067aa0ba902b7" };
+  assert.deepEqual(traceCorrelation({ ...passthrough, correlation: () => ids }), ids);
+  assert.equal(traceCorrelation(passthrough), undefined);
+  assert.equal(traceCorrelation(undefined), undefined);
+  const failing: Tracing = {
+    ...passthrough,
+    correlation: () => {
+      throw new Error("context unavailable");
+    },
+  };
+  assert.equal(traceCorrelation(failing), undefined);
 });
 
 test("a bound work runs once, also when the binding fails as it is called", async () => {

@@ -19,10 +19,18 @@ export interface TraceSpan {
   readonly failure?: ((result: unknown) => unknown) | undefined;
 }
 
+/** The active span's identifiers, which logs carry so a backend can join them to the trace. */
+export type TraceCorrelation = {
+  readonly traceId: string;
+  readonly spanId: string;
+};
+
 /** OpenKnot's tracing contract: instrumentation describes spans, implementations record and propagate them. */
 export interface Tracing {
   /** Carrier fields the implementation reads, so transports select only those. */
   readonly propagationFields?: readonly string[];
+  /** The active span's identifiers, also for a span that is not sampled, or undefined outside a span. */
+  correlation?(): TraceCorrelation | undefined;
   run<T>(span: TraceSpan, work: () => Promise<T>): Promise<T>;
   capture(): PropagationCarrier | undefined;
   /** Captures the caller's native context for deferred work, including after-commit delivery. */
@@ -62,6 +70,14 @@ const traceContextFields: readonly string[] = Object.freeze(["traceparent", "tra
 /** The carrier fields a transport reads and writes: the implementation's own, or W3C Trace Context. */
 export function propagationFields(tracing: Tracing | undefined): readonly string[] {
   return tracing?.propagationFields ?? traceContextFields;
+}
+
+export function traceCorrelation(tracing: Tracing | undefined): TraceCorrelation | undefined {
+  try {
+    return tracing?.correlation?.();
+  } catch {
+    return undefined;
+  }
 }
 
 export function capturePropagation(tracing: Tracing | undefined): PropagationCarrier | undefined {

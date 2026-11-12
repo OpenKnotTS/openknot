@@ -37,7 +37,13 @@
     "@openknot-ts/wire": "workspace:*",
     "redis": "catalog:"
   },
+  "peerDependencies": {
+    "@openknot-ts/error-reporting": "workspace:^",
+    "@openknot-ts/logging": "workspace:^"
+  },
   "devDependencies": {
+    "@openknot-ts/error-reporting": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"
   }

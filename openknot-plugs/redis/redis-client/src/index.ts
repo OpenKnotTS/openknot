@@ -1,3 +1,5 @@
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type { HealthCheckDefinition } from "@openknot-ts/health";
 import { healthCheck } from "@openknot-ts/health";
 import type {
@@ -109,6 +111,30 @@ async function closed(client: RedisManagedClient): Promise<void> {
   }
 }
 
+/**
+ * Hands a client's failures no caller receives to `unattendedFailures`, once per outage: an error is reported only when
+ * the client has been ready since the last one. Errors before its first ready fail acquisition instead. Its error
+ * listener also keeps node-redis from throwing an error that no listener receives. Returns the removal of its listeners.
+ */
+function reportOutages(client: RedisManagedClient, report: UnattendedFailures, name: string): () => void {
+  let ready = false;
+  const restored = () => {
+    ready = true;
+  };
+  const lost = (error: unknown) => {
+    if (ready) {
+      ready = false;
+      report({ error, source: "openknot.redis", attributes: { "openknot.redis.client": name } });
+    }
+  };
+  client.on("ready", restored);
+  client.on("error", lost);
+  return () => {
+    client.off("ready", restored);
+    client.off("error", lost);
+  };
+}
+
 export function redisClient<const R extends Requirements = {}, C extends RedisConnections = RedisConnections>(
   options: RequirementsOptions<R> & {
     readonly create: (
@@ -129,13 +155,30 @@ export function redisClient<const R extends Requirements = {}, C extends RedisCo
 ) {
   return resource({
     ...options,
-    async initialize(dependencies: ResolvedReferences<R>, acquisition) {
+    requirements: { ...options.requirements, __failures: unattendedFailures } as R & {
+      readonly __failures: typeof unattendedFailures;
+    },
+    async initialize(dependencies, acquisition) {
       const clients = await options.create(dependencies, acquisition);
-      const native = [...new Set([clients.commands, clients.subscriber])];
+      // A client that serves both roles is named by its commands role.
+      const names = new Map<RedisManagedClient, string>([[clients.commands, "commands"]]);
+      if (!names.has(clients.subscriber)) {
+        names.set(clients.subscriber, "subscriber");
+      }
+      const native = [...names.keys()];
+      const unwatch = [...names].map(([client, name]) =>
+        reportOutages(client, dependencies.__failures as UnattendedFailures, name),
+      );
+      const ignore = () => {
+        for (const remove of unwatch) {
+          remove();
+        }
+      };
       const abort = () => {
         for (const client of native) {
           client.destroy();
         }
+        ignore();
       };
 
       acquisition.signal.addEventListener("abort", abort, { once: true });
@@ -161,6 +204,8 @@ export function redisClient<const R extends Requirements = {}, C extends RedisCo
       return {
         value: Object.assign(clients, { connection }),
         async release() {
+          // A failure while closing ends the release with it, which reports it instead.
+          ignore();
           const results = await Promise.allSettled(native.map(closed));
 
           const failures = results.flatMap((result) =>

@@ -8,8 +8,8 @@ Manages application-created node-redis command and subscription clients as a Wir
 const redis = redisClient({
   requirements: { settings },
   create: ({ settings }) => ({
-    commands: createClient({ url: settings.REDIS_URL }).on("error", report),
-    subscriber: createClient({ url: settings.REDIS_URL }).on("error", report),
+    commands: createClient({ url: settings.REDIS_URL }),
+    subscriber: createClient({ url: settings.REDIS_URL }),
   }),
 });
 ```
@@ -26,6 +26,7 @@ const redis = redisClient({
 ## Lifecycle
 
 - Both clients connect at acquisition. A client's first error before it is ready fails startup; once ready, its native reconnection applies.
+- Once ready, a client's first error of each outage goes to `unattendedFailures` from `@openknot-ts/error-reporting/wire`, which logs it as `openknot.redis failed` and reports it. The attribute `openknot.redis.client` names the client, `commands` or `subscriber`. The errors of its reconnection attempts are not reported again until it is ready once more.
 - A failed or cancelled startup destroys both. Release closes each once: a ready client first receives the replies to the commands it already sent, a client that is not ready is destroyed at once, and a connection that fails while closing ends the release with its error.
 - node-redis's command `timeout` only covers sending. Set `socket.socketTimeout` with `pingInterval` so a server that stops answering cannot hold a command, or the application's stop.
 - Consumers share the resource through `requirements`; cache adapters never close it.

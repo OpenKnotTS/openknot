@@ -1,6 +1,8 @@
 import { redisClient } from "../src/index.ts";
 import { redisHealthCheck } from "../src/index.ts";
 import type { RedisSubscriber } from "../src/index.ts";
+import type { UnattendedFailure } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import { health, healthProbes } from "@openknot-ts/health";
 import { resource } from "@openknot-ts/wire";
 import { composeModule, defineApplication, runApplication, unit } from "@openknot-ts/wire";
@@ -145,6 +147,34 @@ test("release destroys a client that is not ready, and a connection that fails w
   ]);
 });
 
+test("a ready client reports the first error of each outage as an unattended failure", async () => {
+  const native = clients([]);
+  const reported: UnattendedFailure[] = [];
+  const failures = unit({
+    provides: unattendedFailures,
+    factory: () => (failure: UnattendedFailure) => void reported.push(failure),
+  });
+  const redis = redisClient({ create: () => native });
+  const app = await runApplication(defineApplication({ modules: [composeModule({ providers: { redis, failures } })] }));
+  const lost = new Error("Socket closed unexpectedly");
+  const again = new Error("read ECONNRESET");
+  try {
+    native.subscriber.emit("error", new Error("before its first ready"));
+    native.subscriber.emit("ready");
+    native.subscriber.emit("error", lost);
+    native.subscriber.emit("error", new Error("connect ECONNREFUSED"));
+    native.subscriber.emit("ready");
+    native.subscriber.emit("error", again);
+  } finally {
+    await app.stop();
+  }
+  const attributes = { "openknot.redis.client": "subscriber" };
+  assert.deepEqual(reported, [
+    { error: lost, source: "openknot.redis", attributes },
+    { error: again, source: "openknot.redis", attributes },
+  ]);
+});
+
 test("connection reports lost once and restored on ready", async () => {
   const log: string[] = [];
   const emitter = new EventEmitter();
@@ -274,6 +304,8 @@ test("unsubscribing twice keeps the other watchers", async () => {
     defineApplication({ modules: [composeModule({ providers: { redis, connectionUnit } })] }),
   );
   const connection = app.resolve(connectionUnit);
+  // The resource's own listeners stay while it runs; watchers add and remove only theirs.
+  const own = emitter.eventNames();
 
   let lostA = 0;
   let restoredA = 0;
@@ -306,7 +338,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
   assert.equal(restoredB, 1);
 
   unsubB();
-  assert.deepEqual(emitter.eventNames(), []);
+  assert.deepEqual(emitter.eventNames(), own);
 
   let sharedLost = 0;
   let sharedRestored = 0;
@@ -334,7 +366,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
   assert.equal(sharedRestored, beforeRestored + 1);
 
   unsubD();
-  assert.deepEqual(emitter.eventNames(), []);
+  assert.deepEqual(emitter.eventNames(), own);
   const afterLost = sharedLost;
   const afterRestored = sharedRestored;
   emitter.emit("reconnecting");

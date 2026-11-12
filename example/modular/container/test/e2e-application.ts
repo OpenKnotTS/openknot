@@ -183,14 +183,8 @@ export const redis = redisClient({
   // As Postgres's query timeout does, the native socket timeout bounds a command a server that stops answering holds;
   // pings keep an idle connection from reaching it.
   create: ({ services }) => ({
-    commands: createClient({ url: services.REDIS_URL, pingInterval: 1_000, socket: { socketTimeout: 5_000 } }).on(
-      "error",
-      console.error,
-    ),
-    subscriber: createClient({ url: services.REDIS_URL, pingInterval: 1_000, socket: { socketTimeout: 5_000 } }).on(
-      "error",
-      console.error,
-    ),
+    commands: createClient({ url: services.REDIS_URL, pingInterval: 1_000, socket: { socketTimeout: 5_000 } }),
+    subscriber: createClient({ url: services.REDIS_URL, pingInterval: 1_000, socket: { socketTimeout: 5_000 } }),
   }),
 });
 const redisHealth = redisHealthCheck({ redis });

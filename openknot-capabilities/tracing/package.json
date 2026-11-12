@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/tracing",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "OpenKnot's tracing contract: neutral spans, propagation carriers and safe instrumentation helpers.",
   "license": "MIT",

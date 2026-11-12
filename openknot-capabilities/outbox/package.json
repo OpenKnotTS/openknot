@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/outbox",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "OpenKnot's transactional outbox: publications stored with their change and delivered after commit, at least once and in order per name.",
   "license": "MIT",

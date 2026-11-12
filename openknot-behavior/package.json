@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/behavior",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "description": "Functional models, operations and reader contracts with typed outcomes.",
   "license": "MIT",
   "repository": {

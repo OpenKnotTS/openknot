@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/logging",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "OpenKnot's logging contract: a logger for operations, handlers and plugs, written by a console default or a plug.",
   "license": "MIT",

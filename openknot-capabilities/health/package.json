@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/health",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Lifecycle-bound liveness, readiness and health checks for OpenKnot applications.",
   "license": "MIT",

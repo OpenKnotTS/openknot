@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/sentry-node",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Reports OpenKnot failures to Sentry through the Node SDK, with its lifecycle.",
   "license": "MIT",

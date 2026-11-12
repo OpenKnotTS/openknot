@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/drizzle-outbox",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Drizzle storage for the OpenKnot outbox: records saved in the Unit of Work transaction and claimed by the database clock.",
   "license": "MIT",

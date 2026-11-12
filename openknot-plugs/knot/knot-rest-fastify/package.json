@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-rest-fastify",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Serves OpenKnot REST routes on the Fastify host.",
   "license": "MIT",

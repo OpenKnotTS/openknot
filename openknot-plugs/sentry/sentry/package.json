@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/sentry",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "The Sentry module shared by OpenKnot's Node and Bun Sentry plugs.",
   "license": "MIT",

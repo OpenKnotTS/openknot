@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/cache",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "OpenKnot's cache primitive: read-through, write-through and snapshot layers over consumer-owned native stores, coherent with Units of Work.",
   "license": "MIT",

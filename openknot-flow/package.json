@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/flow",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Typed application handlers, guarded entrypoints and messaging contracts with optional wire integration.",
   "license": "MIT",

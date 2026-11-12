@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/lock",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "OpenKnot's lock contract: non-blocking exclusive execution with a lease and a fencing token.",
   "license": "MIT",

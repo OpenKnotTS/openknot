@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-health",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Health probe HTTP adapters for the OpenKnot Node and Fastify hosts, and the probe routing other hosts share.",
   "license": "MIT",

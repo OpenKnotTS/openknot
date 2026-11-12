@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/fastify-server",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Fastify server lifecycle, plugin selection and draining for OpenKnot applications.",
   "license": "MIT",

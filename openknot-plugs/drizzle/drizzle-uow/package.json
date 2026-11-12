@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/drizzle-uow",
-  "version": "0.0.2-preview",
+  "version": "0.0.3-preview",
   "type": "module",
   "description": "Drizzle transaction sessions for OpenKnot Unit of Work.",
   "license": "MIT",

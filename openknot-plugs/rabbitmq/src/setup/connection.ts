@@ -1,15 +1,9 @@
-import type { ErrorReporter } from "@openknot-ts/error-reporting";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
 import { reportError } from "@openknot-ts/error-reporting";
 import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import { logger } from "@openknot-ts/logging/wire";
 import { config, optional, resource, unit } from "@openknot-ts/wire";
-import type {
-  CancellationOptions,
-  OptionalDependency,
-  Requirements,
-  RequirementsOptions,
-  ResolvedReferences,
-} from "@openknot-ts/wire";
+import type { CancellationOptions, Requirements, RequirementsOptions, ResolvedReferences } from "@openknot-ts/wire";
 import { Connection } from "rabbitmq-client";
 import { z } from "zod";
 
@@ -24,30 +18,24 @@ export const rabbitConfig = config({
   RABBITMQ_ACQUIRE_TIMEOUT_MS: timerMs.default(20_000),
 });
 
+/** A failure no caller receives, with what identifies the delivery it concerns. */
+export type RabbitErrors = (error: unknown, attributes?: ErrorReport["attributes"]) => void;
+
 /**
  * Receives the failures the integration cannot return to a caller: connection errors, topology recovery and listener
- * deliveries that never reached Flow. Writes through the application's `logger` by default; bind it with
- * `unit({ provides: rabbitErrors, factory })` to report them elsewhere.
+ * deliveries that never reached Flow. By default each is written through the application's `logger` and reported to
+ * its error reporter when one is bound; bind it with `unit({ provides: rabbitErrors, factory })` to handle them
+ * elsewhere.
  */
 export const rabbitErrors = unit({
-  requirements: { logger },
+  requirements: { logger, reporter: optional(errorReporter) },
   factory:
-    ({ logger }) =>
-    (error: unknown): void => {
-      logger.error("RabbitMQ failure", { error });
+    ({ logger, reporter }): RabbitErrors =>
+    (error, attributes) => {
+      logger.error("RabbitMQ failure", { ...attributes, error });
+      reportError(reporter, { error, source: "openknot.rabbitmq", expected: false, attributes });
     },
 });
-
-/** A failure no caller receives: written to `rabbitErrors`, and reported when the application binds a reporter. */
-export function rabbitFailures(
-  errors: (error: unknown) => void,
-  reporter: ErrorReporter | undefined,
-): (error: unknown) => void {
-  return (error) => {
-    errors(error);
-    reportError(reporter, { error, source: "openknot.rabbitmq", expected: false });
-  };
-}
 
 /** Owns the native connection returned by create, including every SDK option and inferred custom member. */
 export function rabbitClient<const R extends Requirements = {}, C extends Connection = Connection>(
@@ -57,17 +45,11 @@ export function rabbitClient<const R extends Requirements = {}, C extends Connec
   },
 ) {
   return resource({
-    requirements: { ...options.requirements, __report: rabbitErrors, __reporter: optional(errorReporter) } as R & {
-      readonly __report: typeof rabbitErrors;
-      readonly __reporter: OptionalDependency<typeof errorReporter>;
-    },
+    requirements: { ...options.requirements, __report: rabbitErrors } as R & { readonly __report: typeof rabbitErrors },
     async initialize(dependencies, acquisition) {
       const { signal } = acquisition;
       signal.throwIfAborted();
-      const report = rabbitFailures(
-        dependencies.__report as (error: unknown) => void,
-        dependencies.__reporter as ErrorReporter | undefined,
-      );
+      const report = dependencies.__report as RabbitErrors;
       const timeoutMs = options.startupTimeoutMs?.(dependencies) ?? 10_000;
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
         throw new TypeError("Rabbit startup timeout must be a positive signed 32-bit integer.");

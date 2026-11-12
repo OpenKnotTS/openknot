@@ -1,6 +1,8 @@
-import { rabbitConnectionOf, rabbitErrors, rabbitTopology } from "../src/index.ts";
+import { rabbitConnectionOf, rabbitTopology } from "../src/index.ts";
 import type { ErrorReport } from "@openknot-ts/error-reporting";
 import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { LogRecord } from "@openknot-ts/logging";
+import { logging } from "@openknot-ts/logging/wire";
 import { defineApplication, providePlugs, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
@@ -48,19 +50,17 @@ test("native listeners attach with the first watcher and are removed with the la
   assert.deepEqual([connection.listenerCount("error"), connection.listenerCount("connection")], [0, 0]);
 });
 
-test("connection failures reach the application's rabbitErrors binding instead of the console", async () => {
+test("by default a connection failure is written through the logger and reported once", async () => {
   const closed = createServer();
   await new Promise<void>((resolve) => closed.listen(0, "127.0.0.1", resolve));
   const { port } = closed.address() as { readonly port: number };
   await new Promise<void>((resolve) => closed.close(() => resolve()));
-  const errors: unknown[] = [];
+  const records: LogRecord[] = [];
   const reports: ErrorReport[] = [];
   const controller = new AbortController();
-  const report = unit({
-    provides: rabbitErrors,
-    factory: () => (error: unknown) => {
-      errors.push(error);
-    },
+  const recorded = unit({
+    provides: logging,
+    factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
   });
   const reporter = unit({
     provides: errorReporter,
@@ -75,16 +75,19 @@ test("connection failures reach the application's rabbitErrors binding instead o
     routes: [{ exchange: "events", routingKey: "event" }],
   });
   await assert.rejects(
-    runApplication(defineApplication({ modules: [providePlugs([rabbitConnection, report, reporter])] }), {
+    runApplication(defineApplication({ modules: [providePlugs([rabbitConnection, recorded, reporter])] }), {
       env: { RABBITMQ_URL: `amqp://127.0.0.1:${port}` },
       signal: controller.signal,
       stopOn: [],
     }),
     /reported/,
   );
-  assert.ok(errors.length > 0);
+  assert.ok(reports.length > 0);
   assert.deepEqual(
-    reports.map((each) => [each.error, each.source, each.expected]),
-    errors.map((error) => [error, "openknot.rabbitmq", false]),
+    records.map(({ level, message, attributes }) => [level, message, attributes.error]),
+    reports.map(({ error, source, expected }) => {
+      assert.deepEqual([source, expected], ["openknot.rabbitmq", false]);
+      return ["error", "RabbitMQ failure", error];
+    }),
   );
 });

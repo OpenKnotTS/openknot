@@ -190,4 +190,5 @@ export type { RabbitConsumerConnection, RabbitDelivery, RabbitNativeConsumer } f
 export type { RabbitPublisherBinding, RabbitPublisherConfig } from "./publisher/managed.ts";
 export type { RabbitEnvelope, RabbitNativePublisher, RabbitPublisherConnection } from "./publisher/native.ts";
 export { rabbit, rabbitClient, rabbitErrors } from "./setup/connection.ts";
+export type { RabbitErrors } from "./setup/connection.ts";
 export { rabbitConnectionOf } from "./setup/watch.ts";

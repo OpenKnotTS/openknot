@@ -17,8 +17,9 @@ import type { AdapterRuntime, FamilyAdapter } from "./shared.ts";
 import { lifetime, requireContext } from "./shared.ts";
 import { hookRequirements, resolvedUnitOfWork } from "./unit-of-work.ts";
 import { isReader, isReaderBinding, isReaderComposition } from "@openknot-ts/behavior";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { Definition, DefinitionAdapterContext } from "@openknot-ts/wire";
-import { isPlug, unit } from "@openknot-ts/wire";
+import { isPlug, optional, unit } from "@openknot-ts/wire";
 import { BindPort } from "@openknot-ts/wire/internal/marker";
 import { bindPorts } from "@openknot-ts/wire/internal/plug-bindings";
 
@@ -32,9 +33,9 @@ export function createOutputAdapter(runtime: AdapterRuntime): FamilyAdapter {
     native: SubscriptionImplementation,
   ) {
     return unit({
-      requirements: { carrier },
-      factory: ({ carrier }) =>
-        publication(createSubscriptionPort(port, runtime.host(context, carrier), native), carrier, port),
+      requirements: { carrier, reporter: optional(errorReporter) },
+      factory: ({ carrier, reporter }) =>
+        publication(createSubscriptionPort(port, runtime.host(context, carrier, reporter), native), carrier, port),
     });
   }
   return (definition, context) => {

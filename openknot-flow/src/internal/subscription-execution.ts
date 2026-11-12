@@ -2,9 +2,11 @@ import { InputCancelledError, InputUnavailableError } from "../errors.ts";
 import type { ExecutionOptions } from "../execution.ts";
 import type { GuardRequest } from "../guard.ts";
 import type { SubscriptionDefinition, NativeSubscription, DeliveryOptions } from "../subscription.ts";
+import { observeExecution } from "./execution-logs.ts";
 import type { RuntimeGuard } from "./guard-execution.ts";
 import { guardAdmission } from "./guard-execution.ts";
 import { optionsIndex } from "./publication.ts";
+import { reportFailure } from "./reporting.ts";
 import { executionOptions, ownField, requireRequest } from "./request.ts";
 import type { InputHost, RuntimeScope } from "./runtime.ts";
 import { cleanupError, executionError, requireSuccess } from "./safety.ts";
@@ -37,6 +39,7 @@ export function createSubscriptionPort(
   const admit = guardAdmission(port.guards);
 
   const index = optionsIndex(port);
+  const operation = { kind: "subscribe" as const, reference: port };
 
   return Object.freeze({
     async publish(...args: unknown[]): Promise<void> {
@@ -60,7 +63,57 @@ export function createSubscriptionPort(
     },
     async subscribe(request: GuardRequest<unknown>): Promise<AsyncIterable<unknown>> {
       let options: ExecutionOptions = {};
-      let settled: Outcome<AsyncIterable<unknown>, Error> | undefined;
+      let observed = false;
+
+      // Admits in a scope of its own; once admission has settled, only that scope's cleanup can still fail.
+      const admission = async (
+        guards: ReturnType<typeof admit>,
+        input: unknown,
+      ): Promise<Outcome<AsyncIterable<unknown>, Error>> => {
+        let settled: Outcome<AsyncIterable<unknown>, Error> | undefined;
+        return protectAsync(
+          () =>
+            host.withScope(
+              async (scope) => {
+                settled = await scope.execution.run({}, async (signal) => {
+                  const checked = await guards((reference) => scope.resolve(reference) as RuntimeGuard, signal);
+                  if (checked.isError) {
+                    return checked;
+                  }
+                  if (signal.aborted) {
+                    return failure(InputCancelledError(signal.reason));
+                  }
+                  const native = implementation.resolve(scope);
+                  // A stream keeps the caller's lifetime, not the short admission scope's signal, and ends once the
+                  // application begins stopping, so no open stream holds shutdown.
+                  const lifetime = Object.freeze({
+                    ...options,
+                    signal:
+                      options.signal === undefined ? host.stopping : AbortSignal.any([options.signal, host.stopping]),
+                  });
+                  const stream = await native.subscribe(
+                    ...((port.kind === "topic" ? [input, lifetime] : [lifetime]) as never[]),
+                  );
+                  return success(stream);
+                });
+                return settled;
+              },
+              { ...options, root: port },
+            ),
+          (error) => {
+            if (settled === undefined) {
+              return executionError(error, options.signal);
+            }
+
+            // Only the admission scope's cleanup failed: no caller receives an admitted stream, so it does not stand.
+            if (!settled.isError) {
+              release(settled.value);
+            }
+
+            return cleanupError(settled, error, false);
+          },
+        );
+      };
 
       const result = await protectAsync(
         async () => {
@@ -76,48 +129,27 @@ export function createSubscriptionPort(
 
           const input = ownField(fields, "input");
 
-          return host.withScope(
-            async (scope) => {
-              settled = await scope.execution.run({}, async (signal) => {
-                const checked = await guards((reference) => scope.resolve(reference) as RuntimeGuard, signal);
-                if (checked.isError) {
-                  return checked;
-                }
-                if (signal.aborted) {
-                  return failure(InputCancelledError(signal.reason));
-                }
-                const native = implementation.resolve(scope);
-                // A stream keeps the caller's lifetime, not the short admission scope's signal, and ends once the
-                // application begins stopping, so no open stream holds shutdown.
-                const lifetime = Object.freeze({
-                  ...options,
-                  signal:
-                    options.signal === undefined ? host.stopping : AbortSignal.any([options.signal, host.stopping]),
-                });
-                const stream = await native.subscribe(
-                  ...((port.kind === "topic" ? [input, lifetime] : [lifetime]) as never[]),
-                );
-                return success(stream);
-              });
-              return settled;
+          // From here the admission's span covers the outcome, so its failure is reported while the span is active.
+          observed = true;
+          return observeExecution(
+            host.tracing,
+            host.logs,
+            { ...operation, propagation: options.propagation, attributes: options.traceAttributes },
+            async () => {
+              const admitted = await admission(guards, input);
+              if (admitted.isError) {
+                reportFailure(host.reporter, operation, admitted.error, options.traceAttributes);
+              }
+              return admitted;
             },
-            { ...options, root: port },
-            { kind: "subscribe", reference: port },
           );
         },
-        (error) => {
-          if (settled === undefined) {
-            return executionError(error, options.signal);
-          }
-
-          // Only the admission scope's cleanup failed: no caller receives an admitted stream, so it does not stand.
-          if (!settled.isError) {
-            release(settled.value);
-          }
-
-          return cleanupError(settled, error, false);
-        },
+        (error) => executionError(error, options.signal),
       );
+      // A request refused before its admission ran has no span of its own.
+      if (!observed && result.isError) {
+        reportFailure(host.reporter, operation, result.error);
+      }
       // A transport receives the admitted stream, or the admission's classified failure thrown.
       return requireSuccess(result);
     },

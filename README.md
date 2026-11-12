@@ -283,7 +283,7 @@ The same boundaries can become independent packages without changing their respo
 | [`@openknot-ts/wire`](openknot-wire/README.md) | Dependency injection, configuration and resource lifecycle. |
 | [`@openknot-ts/behavior`](openknot-behavior/README.md) | Models, operations, reader contracts and functional errors. |
 | [`@openknot-ts/flow`](openknot-flow/README.md) | Application execution, Unit of Work, guarded ports and messaging contracts. |
-| [Capabilities](openknot-capabilities/README.md) | Optional health, tracing, logging, outbox, caching, replication, versioning and locking. |
+| [Capabilities](openknot-capabilities/README.md) | Optional health, tracing, logging, error reporting, outbox, caching, replication, versioning and locking. |
 
 ### Plugs
 
@@ -298,7 +298,7 @@ Each plug keeps its SDK's options and types, and adds dependency injection, mana
 | Redis | [`redis-client`](openknot-plugs/redis/redis-client/README.md), [`redis-lock`](openknot-plugs/redis/redis-lock/README.md), [`redis-replication`](openknot-plugs/redis/redis-replication/README.md) |
 | Health | [`knot-health`](openknot-plugs/knot/knot-health/README.md), [`knot-health-bun`](openknot-plugs/knot/knot-health-bun/README.md) |
 | Identity | [`auth0-actor`](openknot-plugs/auth0/auth0-actor/README.md), [`auth0-authentication`](openknot-plugs/trpc/middleware/auth0-authentication/README.md) |
-| Observability | [`opentelemetry-tracing`](openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), [`pino-logging`](openknot-plugs/pino/pino-logging/README.md) |
+| Observability | [`opentelemetry-tracing`](openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), [`pino-logging`](openknot-plugs/pino/pino-logging/README.md), [`sentry-node`](openknot-plugs/sentry/sentry-node/README.md), [`sentry-bun`](openknot-plugs/sentry/sentry-bun/README.md) |
 | Locks | [`knot-lock`](openknot-plugs/knot/knot-lock/README.md) |
 
 ## Development

@@ -5,6 +5,9 @@ import type { CacheChange, CacheOrder, CacheMemberReads, CacheResult, PortEntity
 import type { LayerStop } from "@openknot-ts/cache/layers";
 import { isAsyncIterable, keyOf, layered, layerStartup, storeWaits } from "@openknot-ts/cache/layers";
 import { asCacheResult } from "@openknot-ts/cache/result";
+import type { ErrorReporter } from "@openknot-ts/error-reporting";
+import { reportError } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { CommittedChange, EntityKey, UnitOfWorkChanges } from "@openknot-ts/flow/wire";
 import { unitOfWorkChanges } from "@openknot-ts/flow/wire";
 import type { HealthCheckDefinition } from "@openknot-ts/health";
@@ -490,6 +493,7 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
     channel: ReplicationChannel,
     locks: Lock,
     tracing: Tracing | undefined,
+    reporter: ErrorReporter | undefined,
     dependencies: ResolvedReferences<Requirements>,
   ): Replica {
     const origin = randomUUID();
@@ -556,7 +560,15 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
       }
 
       reported = true;
-      void withTrace(tracing, { name: `${namespace} replication failed`, failure: () => error }, async () => undefined);
+      // Reported inside the failure's span, so a reporter links it to the trace.
+      void withTrace(tracing, { name: `${namespace} replication failed`, failure: () => error }, async () =>
+        reportError(reporter, {
+          error,
+          source: "openknot.replication",
+          expected: false,
+          attributes: { "openknot.replication.namespace": namespace },
+        }),
+      );
     }
 
     /** Reads go to the source, and a marker reply already in flight no longer counts. */
@@ -1337,14 +1349,24 @@ function compose<const T extends Readonly<Record<string, unknown>>>(parts: T): R
       __channel: replicationChannel,
       __lock: lock,
       __trace: optional(trace),
+      __reporter: optional(errorReporter),
     } as Requirements,
-    factory: ({ __changes, __store, __channel, __lock, __trace, ...dependencies }: Record<string, unknown>) =>
+    factory: ({
+      __changes,
+      __store,
+      __channel,
+      __lock,
+      __trace,
+      __reporter,
+      ...dependencies
+    }: Record<string, unknown>) =>
       createReplica(
         __changes as UnitOfWorkChanges,
         __store as ReplicaStore,
         __channel as ReplicationChannel,
         __lock as Lock,
         __trace as Tracing | undefined,
+        __reporter as ErrorReporter | undefined,
         dependencies as ResolvedReferences<Requirements>,
       ),
   });

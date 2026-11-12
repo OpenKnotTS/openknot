@@ -3,6 +3,8 @@ import { cache, cacheKey, unsupported } from "../src/index.ts";
 import type { Deleted } from "@openknot-ts/behavior";
 import { deleted, reader, success } from "@openknot-ts/behavior";
 import type {} from "@openknot-ts/behavior/wire";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { UowCommitted, Upserted } from "@openknot-ts/flow";
 import { command, defaultUnitOfWork, hook, unitOfWork, upserted, writer } from "@openknot-ts/flow";
 import type {} from "@openknot-ts/flow/wire";
@@ -194,8 +196,10 @@ test("a read of an entity the Unit of Work changed goes to the source", async ()
   }
 });
 
-test("a failing native store makes the layer unavailable without failing the command", async () => {
+test("a failing native store makes the layer unavailable without failing the command, and is reported once", async () => {
   const state = fixture({ strategy: "write-through", failing: true });
+  const reports: ErrorReport[] = [];
+  const reporter = unit({ provides: errorReporter, factory: () => (report: ErrorReport) => reports.push(report) });
   const save = command<Role>()({
     requirements: { saveRole, findRole },
     run: async (value, ctx) => {
@@ -203,13 +207,17 @@ test("a failing native store makes the layer unavailable without failing the com
       return success(await ctx.findRole(value.id));
     },
   });
-  const { app, call, read } = await run(state.definitions, save);
+  const { app, call, read } = await run([...state.definitions, reporter], save);
   try {
     const result = (await call(role("r1", "admin", 0))) as { readonly isError: boolean };
     assert.equal(result.isError, false);
     assert.equal((await read("r1"))?.name, "admin");
     const health = await app.withScope((scope) => scope.resolve(state.health));
     assert.equal(await health.check({ signal: new AbortController().signal }), "down");
+    assert.deepEqual(
+      reports.map((report) => [report.source, report.expected, typeof report.attributes?.["openknot.cache.name"]]),
+      [["openknot.cache", false, "string"]],
+    );
   } finally {
     await app.stop();
   }

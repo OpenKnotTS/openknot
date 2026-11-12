@@ -47,12 +47,14 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/error-reporting": "workspace:*",
     "@openknot-ts/tracing": "workspace:*"
   },
   "peerDependencies": {
     "@openknot-ts/behavior": "workspace:^",
     "@openknot-ts/wire": "workspace:^",
     "@openknot-ts/health": "workspace:^",
+    "@openknot-ts/error-reporting": "workspace:^",
     "@openknot-ts/tracing": "workspace:^",
     "@openknot-ts/flow": "workspace:^"
   }

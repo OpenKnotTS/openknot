@@ -1,0 +1,45 @@
+{
+  "name": "@openknot-ts/sentry",
+  "version": "0.0.2-preview",
+  "type": "module",
+  "description": "The Sentry module shared by OpenKnot's Node and Bun Sentry plugs.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OpenKnotTS/openknot.git",
+    "directory": "openknot-plugs/sentry/sentry"
+  },
+  "packageManager": "pnpm@10.20.0",
+  "engines": {
+    "node": ">=24.11.0"
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "check": "tsc --noEmit",
+    "test": "node --test --test-isolation=none test/*.test.ts",
+    "prepack": "pnpm build"
+  },
+  "peerDependencies": {
+    "@openknot-ts/error-reporting": "workspace:^",
+    "@openknot-ts/wire": "workspace:^"
+  },
+  "devDependencies": {
+    "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/error-reporting": "workspace:*",
+    "@openknot-ts/wire": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

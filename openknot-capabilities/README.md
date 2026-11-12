@@ -7,6 +7,7 @@ This folder groups independent workspace packages. It has no package manifest, e
 | [`@openknot-ts/health`](health/README.md)           | Probes over Wire's `applicationStatus`           | Lifecycle-bound liveness, readiness and health    |
 | [`@openknot-ts/tracing`](tracing/README.md)         | Neutral spans, carriers and `trace`              | OpenKnot's own tracing API                        |
 | [`@openknot-ts/logging`](logging/README.md)         | `logger` over a `Logging` implementation         | Leveled logs, written on the console by default   |
+| [`@openknot-ts/error-reporting`](error-reporting/README.md) | `errorReporter`, bound by a plug such as Sentry | Failures that end at a boundary, to one reporter |
 | [`@openknot-ts/versioning`](versioning/README.md)   | Versioning contract and native implementations   | Optimistic concurrency with `VersionConflict`     |
 | [`@openknot-ts/lock`](lock/README.md)               | Lock contract and native implementations         | Exclusive, non-blocking execution with a lease    |
 | [`@openknot-ts/cache`](cache/README.md)             | Cache layers over consumer-owned native stores   | Read-through, write-through and snapshot caching  |

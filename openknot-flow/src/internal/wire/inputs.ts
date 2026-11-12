@@ -5,8 +5,9 @@ import { guardedReferences } from "../../guard.ts";
 import { bindInputSource, createInputInvoker } from "../runtime.ts";
 import type { AdapterRuntime, FamilyAdapter } from "./shared.ts";
 import { requireContext } from "./shared.ts";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { Definition, PlugDefinition } from "@openknot-ts/wire";
-import { isPlug, resource, unit } from "@openknot-ts/wire";
+import { isPlug, optional, resource, unit } from "@openknot-ts/wire";
 
 function isInputPlug(value: unknown): value is PlugDefinition & { readonly port: InputPortDefinition } {
   return isPlug(value) && isInputPort(value.port);
@@ -26,8 +27,8 @@ export function createInputAdapter(runtime: AdapterRuntime): FamilyAdapter {
         // Every invocation opens a scope of its own, for this port.
         opensScope: true,
         provider: unit({
-          requirements: { carrier: runtime.carrier },
-          factory: ({ carrier }) => createInputInvoker(definition, runtime.host(selected, carrier)),
+          requirements: { carrier: runtime.carrier, reporter: optional(errorReporter) },
+          factory: ({ carrier, reporter }) => createInputInvoker(definition, runtime.host(selected, carrier, reporter)),
         }),
       };
     }

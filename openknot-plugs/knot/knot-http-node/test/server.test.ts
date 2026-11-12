@@ -1,5 +1,7 @@
 import type { HttpMiddleware, HttpServer } from "../src/index.ts";
 import { httpConfig, httpMiddleware, nodeHttpServer } from "../src/index.ts";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import {
   composeModule,
   defineApplication,
@@ -49,6 +51,8 @@ test("the server runs the application's request listener through the container l
 
 test("a handler or middleware that fails answers 500 without its private headers, and the host keeps serving", async (t) => {
   const reported = t.mock.method(console, "error", () => undefined);
+  const reports: ErrorReport[] = [];
+  const reporter = unit({ provides: errorReporter, factory: () => (report: ErrorReport) => reports.push(report) });
   const failure = new Error("private failure");
   const handler = unit({
     factory: (): RequestListener => (request, response) => {
@@ -74,7 +78,7 @@ test("a handler or middleware that fails answers 500 without its private headers
     },
   });
   const app = await runApplication(
-    defineApplication({ modules: [composeModule({ providers: { server, failing } })] }),
+    defineApplication({ modules: [composeModule({ providers: { server, failing, reporter } })] }),
     {
       env,
     },
@@ -90,6 +94,10 @@ test("a handler or middleware that fails answers 500 without its private headers
     assert.deepEqual(
       reported.mock.calls.map((call) => [String(call.arguments[0]).replace(/^\S+ /, ""), call.arguments[1]]),
       Array.from({ length: 3 }, () => ["ERROR HTTP request handler failed", { error: failure }]),
+    );
+    assert.deepEqual(
+      reports.map((report) => [report.error, report.source, report.expected]),
+      Array.from({ length: 3 }, () => [failure, "openknot.http", false]),
     );
     assert.equal(await (await fetch(`${url}/healthy`)).text(), "ok");
   } finally {

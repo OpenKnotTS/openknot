@@ -15,16 +15,17 @@ import type { ExecutionLifetime } from "./cancellation.ts";
 import { executionLifetime } from "./cancellation.ts";
 import { addCheckpoints, portKeys } from "./checkpoint.ts";
 import type { ExecutionLogs } from "./execution-logs.ts";
-import { logRefusal } from "./execution-logs.ts";
+import { logRefusal, observeExecution } from "./execution-logs.ts";
 import type { ExecutionEnvironment } from "./execution-runtime.ts";
 import type { RuntimeGuard } from "./guard-execution.ts";
 import { guardAdmission } from "./guard-execution.ts";
+import { reportFailure } from "./reporting.ts";
 import { executionOptions, ownField, requireRequest } from "./request.ts";
 import { cleanupError, executionError, requireSuccess } from "./safety.ts";
-import type { ExecutionTrace } from "./tracing.ts";
 import type { Outcome } from "@openknot-ts/behavior";
 import { failure } from "@openknot-ts/behavior";
 import { protectAsync, requireOutcome } from "@openknot-ts/behavior/internal/safety";
+import type { ErrorReporter } from "@openknot-ts/error-reporting";
 import type { Tracing } from "@openknot-ts/tracing";
 import type { PlugDefinition, PlugHandle } from "@openknot-ts/wire";
 
@@ -41,6 +42,7 @@ export interface InputHost {
   readonly stopping: AbortSignal;
   readonly tracing?: Tracing | undefined;
   readonly logs?: ExecutionLogs | undefined;
+  readonly reporter?: ErrorReporter | undefined;
   /**
    * `root` is the port the scope executes: it acquires only the scoped resources that port may need. `bounded`
    * declares that `signal` aborts once the scope's execution completes, so that execution adopts it.
@@ -48,7 +50,6 @@ export interface InputHost {
   withScope<T>(
     work: (scope: RuntimeScope) => T | Promise<T>,
     options?: ExecutionOptions & { readonly cleanup?: boolean; readonly root?: object; readonly bounded?: boolean },
-    operation?: Pick<ExecutionTrace, "kind" | "reference">,
   ): Promise<T>;
 }
 
@@ -110,7 +111,6 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
     let admitted = false;
     let observed = false;
     let signal: AbortSignal | undefined;
-    let completed: Outcome<unknown, Error> | undefined;
     try {
       const result = await protectAsync(
         async () => {
@@ -166,69 +166,91 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
           const input = port.kind === "scheduler" ? undefined : ownField(fields, "input");
           const guards = admit?.(fields);
           const executionSignal = signal;
+          const traceAttributes = { ...attributes, ...options.traceAttributes };
 
-          // From here the execution's own record covers the outcome.
+          // Runs the execution in its scope and classifies it; once it has settled, only the scope's cleanup can fail.
+          const settle = async (): Promise<Outcome<unknown, Error>> => {
+            let completed: Outcome<unknown, Error> | undefined;
+            return protectAsync(
+              () =>
+                host.withScope(
+                  async (scope) => {
+                    // The execution's signal follows the invocation's; guards, port calls and run() share it.
+                    completed = await scope.execution.run({}, async (active) => {
+                      if (guards !== undefined) {
+                        const checked = await guards((definition) => scope.resolve(definition) as RuntimeGuard, active);
+
+                        if (checked.isError) {
+                          return checked;
+                        }
+
+                        if (active.aborted) {
+                          return failure(InputCancelledError(active.reason));
+                        }
+                      }
+
+                      const dependencies: Record<string, unknown> = {};
+
+                      for (const [key, reference] of requirements) {
+                        dependencies[key] = scope.resolve(reference);
+                      }
+
+                      addCheckpoints(dependencies, ports, scope.execution);
+
+                      const ctx = Object.freeze({
+                        ...dependencies,
+                        ...(isExposure(port) ? {} : { trigger: Object.freeze(metadata) }),
+                        signal: active,
+                        actor: scope.execution.execution.actor,
+                      });
+
+                      const result: InputResult = port[InputRun](input as never, ctx as never);
+                      const outcome = await result;
+
+                      requireOutcome(outcome, "Input run() must return an Outcome");
+
+                      return outcome;
+                    });
+                    // The execution adopted the invocation's signal; it ends with the execution, before the scope closes.
+                    lifetime?.end();
+
+                    return completed;
+                  },
+                  {
+                    signal: executionSignal,
+                    ...(options.actor === undefined ? {} : { actor: options.actor }),
+                    ...(options.propagation === undefined ? {} : { propagation: options.propagation }),
+                    traceAttributes,
+                    root: port,
+                    bounded: true,
+                  },
+                ),
+              (error) => (completed === undefined ? executionError(error, signal) : cleanupError(completed, error)),
+            );
+          };
+
+          // From here the execution's own record covers the outcome. Its span also covers the classified result, so
+          // the failure is reported while the span is active.
           observed = true;
-          return await host.withScope(
-            async (scope) => {
-              // The execution's signal follows the invocation's; guards, port calls and run() share it.
-              completed = await scope.execution.run({}, async (active) => {
-                if (guards !== undefined) {
-                  const checked = await guards((definition) => scope.resolve(definition) as RuntimeGuard, active);
-
-                  if (checked.isError) {
-                    return checked;
-                  }
-
-                  if (active.aborted) {
-                    return failure(InputCancelledError(active.reason));
-                  }
-                }
-
-                const dependencies: Record<string, unknown> = {};
-
-                for (const [key, reference] of requirements) {
-                  dependencies[key] = scope.resolve(reference);
-                }
-
-                addCheckpoints(dependencies, ports, scope.execution);
-
-                const ctx = Object.freeze({
-                  ...dependencies,
-                  ...(isExposure(port) ? {} : { trigger: Object.freeze(metadata) }),
-                  signal: active,
-                  actor: scope.execution.execution.actor,
-                });
-
-                const result: InputResult = port[InputRun](input as never, ctx as never);
-                const outcome = await result;
-
-                requireOutcome(outcome, "Input run() must return an Outcome");
-
-                return outcome;
-              });
-              // The execution adopted the invocation's signal; it ends with the execution, before the scope closes.
-              lifetime?.end();
-
-              return completed;
+          return await observeExecution(
+            host.tracing,
+            host.logs,
+            { ...operation, propagation: options.propagation, attributes: traceAttributes },
+            async () => {
+              const settled = await settle();
+              if (settled.isError) {
+                reportFailure(host.reporter, operation, settled.error, traceAttributes);
+              }
+              return settled;
             },
-            {
-              signal: executionSignal,
-              ...(options.actor === undefined ? {} : { actor: options.actor }),
-              ...(options.propagation === undefined ? {} : { propagation: options.propagation }),
-              traceAttributes: { ...attributes, ...options.traceAttributes },
-              root: port,
-              bounded: true,
-            },
-            operation,
           );
         },
-        // Once the execution has settled, only its scope's cleanup can still fail.
-        (error) => (completed === undefined ? executionError(error, signal) : cleanupError(completed, error)),
+        (error) => executionError(error, signal),
       );
-      // A request refused before its execution ran has no record of its own.
+      // A request refused before its execution ran has no record or span of its own.
       if (!observed && "isError" in result && result.isError) {
         logRefusal(host.logs, operation, result.error);
+        reportFailure(host.reporter, operation, result.error);
       }
       return result;
     } finally {
@@ -248,6 +270,7 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
   };
   const refuse = (error: Error): Promise<never> => {
     logRefusal(host.logs, operation, error);
+    reportFailure(host.reporter, operation, error);
     return handled(Promise.reject(error));
   };
 

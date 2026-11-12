@@ -36,6 +36,7 @@
     "@openknot-ts/cache": "workspace:*",
     "@openknot-ts/health": "workspace:*",
     "@openknot-ts/lock": "workspace:*",
+    "@openknot-ts/error-reporting": "workspace:*",
     "@openknot-ts/tracing": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@openknot-ts/flow": "workspace:*",
@@ -47,6 +48,7 @@
     "@openknot-ts/cache": "workspace:^",
     "@openknot-ts/health": "workspace:^",
     "@openknot-ts/lock": "workspace:^",
+    "@openknot-ts/error-reporting": "workspace:^",
     "@openknot-ts/tracing": "workspace:^",
     "@openknot-ts/wire": "workspace:^",
     "@openknot-ts/flow": "workspace:^"

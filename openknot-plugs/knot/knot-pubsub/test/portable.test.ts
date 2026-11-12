@@ -19,6 +19,7 @@ test("the built package emits portable consumer declarations and runs without tR
     ["wire", "openknot-wire"],
     ["behavior", "openknot-behavior"],
     ["flow", "openknot-flow"],
+    ["error-reporting", "openknot-capabilities/error-reporting"],
     ["tracing", "openknot-capabilities/tracing"],
     ["logging", "openknot-capabilities/logging"],
     ["versioning", "openknot-capabilities/versioning"],

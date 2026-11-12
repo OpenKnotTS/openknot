@@ -1,5 +1,7 @@
+import { rabbitFailures } from "../setup/connection.ts";
 import type { RabbitResource, RabbitTopologyResource } from "../setup/topology.ts";
 import { rabbitmqListener } from "./listener.ts";
+import { reportError } from "@openknot-ts/error-reporting";
 import type { InputPortDefinition, InputResult, Listener } from "@openknot-ts/flow";
 import { plug } from "@openknot-ts/wire";
 import type { Plug, Requirements } from "@openknot-ts/wire";
@@ -39,7 +41,7 @@ export function bindRabbitListener(
     port,
     requirements: { topology },
     bind: (context) => {
-      const { declarations, connection, report } = context.topology;
+      const { declarations, connection, report, reporter } = context.topology;
       const queue = declarations.queues.find((entry) => entry.queue === options.queue);
 
       if (queue === undefined) {
@@ -76,10 +78,21 @@ export function bindRabbitListener(
             // Flow logs every failure of an execution it ran; only a message it never received is reported here.
             if (failure.kind === "decode") {
               report(failure);
+              reportError(reporter, {
+                error: failure.error,
+                source: "openknot.rabbitmq",
+                expected: false,
+                attributes: {
+                  "messaging.destination.name": options.queue,
+                  ...(failure.delivery.messageId === undefined
+                    ? {}
+                    : { "messaging.message.id": failure.delivery.messageId }),
+                },
+              });
             }
             return failure.kind === "post-commit" ? "ack" : "reject";
           },
-          onError: report,
+          onError: rabbitFailures(report, reporter),
         },
         context,
       );

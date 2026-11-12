@@ -4,6 +4,8 @@ import { memoryBus, memoryLock, memoryStore } from "./fakes.ts";
 import { deleted, reader, success } from "@openknot-ts/behavior";
 import type {} from "@openknot-ts/behavior/wire";
 import type { CacheChange } from "@openknot-ts/cache";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { Deleted, Upserted } from "@openknot-ts/flow";
 import { command, upserted, writer } from "@openknot-ts/flow";
 import type {} from "@openknot-ts/flow/wire";
@@ -876,9 +878,10 @@ test(
   },
 );
 
-test("an outage traces once", { timeout: 10_000 }, async (t) => {
+test("an outage traces and is reported once", { timeout: 10_000 }, async (t) => {
   const { w, store, bus, shared } = setup();
   const failures: unknown[] = [];
+  const reports: ErrorReport[] = [];
   const tracing: Tracing = {
     async run(span, work) {
       if (span.name === "test:role replication failed") {
@@ -889,13 +892,20 @@ test("an outage traces once", { timeout: 10_000 }, async (t) => {
     capture: () => undefined,
     bind: (work) => work,
   };
-  const a = await instance(w, store, bus, shared, [unit({ provides: trace, factory: () => tracing })]);
+  const a = await instance(w, store, bus, shared, [
+    unit({ provides: trace, factory: () => tracing }),
+    unit({ provides: errorReporter, factory: () => (report: ErrorReport) => reports.push(report) }),
+  ]);
   t.after(() => a.app.stop());
   a.store.failNextApply();
   await a.save(role("r1", "first failure", 1));
   a.store.failNextApply();
   await a.save(role("r1", "same outage", 2));
   assert.equal(failures.length, 1);
+  assert.deepEqual(
+    reports.map((report) => [report.error, report.source, report.attributes?.["openknot.replication.namespace"]]),
+    [[failures[0], "openknot.replication", "test:role"]],
+  );
   assert.equal(await a.health(), "down");
   const ready = bus.next(isReady);
   const reloaded = nextReload(w, await a.local());

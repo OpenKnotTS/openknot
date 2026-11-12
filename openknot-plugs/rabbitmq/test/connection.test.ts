@@ -1,4 +1,6 @@
 import { rabbitConnectionOf, rabbitErrors, rabbitTopology } from "../src/index.ts";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import { defineApplication, providePlugs, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
@@ -52,11 +54,18 @@ test("connection failures reach the application's rabbitErrors binding instead o
   const { port } = closed.address() as { readonly port: number };
   await new Promise<void>((resolve) => closed.close(() => resolve()));
   const errors: unknown[] = [];
+  const reports: ErrorReport[] = [];
   const controller = new AbortController();
   const report = unit({
     provides: rabbitErrors,
     factory: () => (error: unknown) => {
       errors.push(error);
+    },
+  });
+  const reporter = unit({
+    provides: errorReporter,
+    factory: () => (reported: ErrorReport) => {
+      reports.push(reported);
       controller.abort(new Error("reported"));
     },
   });
@@ -66,7 +75,7 @@ test("connection failures reach the application's rabbitErrors binding instead o
     routes: [{ exchange: "events", routingKey: "event" }],
   });
   await assert.rejects(
-    runApplication(defineApplication({ modules: [providePlugs([rabbitConnection, report])] }), {
+    runApplication(defineApplication({ modules: [providePlugs([rabbitConnection, report, reporter])] }), {
       env: { RABBITMQ_URL: `amqp://127.0.0.1:${port}` },
       signal: controller.signal,
       stopOn: [],
@@ -74,4 +83,8 @@ test("connection failures reach the application's rabbitErrors binding instead o
     /reported/,
   );
   assert.ok(errors.length > 0);
+  assert.deepEqual(
+    reports.map((each) => [each.error, each.source, each.expected]),
+    errors.map((error) => [error, "openknot.rabbitmq", false]),
+  );
 });

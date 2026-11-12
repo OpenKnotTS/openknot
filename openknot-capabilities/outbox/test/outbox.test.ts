@@ -2,6 +2,8 @@ import { outboxHealth } from "../src/health.ts";
 import type { OutboxRecord, OutboxStore, StuckRecord } from "../src/index.ts";
 import { outbox, outboxControl, outboxStore } from "../src/index.ts";
 import { error, failure, success } from "@openknot-ts/behavior";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import type { PublishOptions, UnitOfWorkImplementation } from "@openknot-ts/flow";
 import { command, defaultUnitOfWork, publisher } from "@openknot-ts/flow";
 import type {} from "@openknot-ts/flow/wire";
@@ -571,6 +573,27 @@ test("stuck records are reported, discarded or delivered again on request", asyn
     assert.deepEqual(
       sent.map((each) => each.message.name),
       ["later"],
+    );
+  } finally {
+    await app.stop();
+  }
+});
+
+test("a delivery round that fails is reported once, with the outbox's name", { timeout: 5_000 }, async () => {
+  const { start, store, seed } = scenario();
+  const failure = new Error("store unavailable");
+  store.claim = async () => {
+    throw failure;
+  };
+  seed("events", { name: "left" });
+  const reported = Promise.withResolvers<ErrorReport>();
+  const reporter = unit({ provides: errorReporter, factory: () => (report: ErrorReport) => reported.resolve(report) });
+  const app = await start([reporter]);
+  try {
+    const report = await reported.promise;
+    assert.deepEqual(
+      [report.error, report.source, report.expected, report.attributes],
+      [failure, "openknot.outbox", false, { "openknot.outbox.name": "events" }],
     );
   } finally {
     await app.stop();

@@ -1,7 +1,9 @@
-import { rabbitErrors } from "./connection.ts";
+import { rabbitErrors, rabbitFailures } from "./connection.ts";
 import type { RabbitExchange, RabbitExchangeBinding, RabbitQueue, RabbitQueueBinding } from "./native.ts";
-import { resource } from "@openknot-ts/wire";
-import type { ManagedResource, Provider, ResolvedReferences } from "@openknot-ts/wire";
+import type { ErrorReporter } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import { optional, resource } from "@openknot-ts/wire";
+import type { ManagedResource, OptionalDependency, Provider, ResolvedReferences } from "@openknot-ts/wire";
 import type { Connection } from "rabbitmq-client";
 
 export interface RabbitRoute {
@@ -20,11 +22,18 @@ export interface RabbitDeclarations {
 export interface RegisteredRabbitTopology {
   readonly connection: Connection;
   readonly declarations: RabbitDeclarations;
+  /** Writes a failure no caller receives to `rabbitErrors`. */
   readonly report: (error: unknown) => void;
+  /** The application's error reporter, when one is bound. */
+  readonly reporter: ErrorReporter | undefined;
 }
 
 export type RabbitResource = Provider<ManagedResource<Connection>, never, "resource">;
-type TopologyRequirements<C extends RabbitResource> = { readonly rabbit: C; readonly report: typeof rabbitErrors };
+type TopologyRequirements<C extends RabbitResource> = {
+  readonly rabbit: C;
+  readonly report: typeof rabbitErrors;
+  readonly reporter: OptionalDependency<typeof errorReporter>;
+};
 
 export type RabbitTopologyResource<C extends RabbitResource = RabbitResource> = Provider<
   ManagedResource<RegisteredRabbitTopology>,
@@ -39,15 +48,16 @@ export function registerRabbitTopology<C extends RabbitResource>(
   connection: C,
 ): RabbitTopologyResource<C> {
   return resource({
-    requirements: { rabbit: connection, report: rabbitErrors },
+    requirements: { rabbit: connection, report: rabbitErrors, reporter: optional(errorReporter) },
     async initialize(dependencies, { signal }) {
       const rabbit = dependencies.rabbit as Connection;
-      const report = dependencies.report;
+      const { reporter } = dependencies;
+      const fail = rabbitFailures(dependencies.report, reporter);
       let closing = false;
       async function declare() {
         const channel = await rabbit.acquire();
         const abort = () => {
-          void channel.close().catch(report);
+          void channel.close().catch(fail);
         };
 
         signal.addEventListener("abort", abort, { once: true });
@@ -83,7 +93,7 @@ export function registerRabbitTopology<C extends RabbitResource>(
       const recover = () => {
         if (!closing) {
           pending = pending.then(declare, declare);
-          void pending.catch(report);
+          void pending.catch(fail);
         }
       };
 
@@ -99,7 +109,7 @@ export function registerRabbitTopology<C extends RabbitResource>(
       }
 
       return {
-        value: { connection: rabbit, declarations, report },
+        value: { connection: rabbit, declarations, report: dependencies.report, reporter },
         async release() {
           closing = true;
           rabbit.off("connection", recover);

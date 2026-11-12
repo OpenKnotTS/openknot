@@ -1,6 +1,15 @@
+import type { ErrorReporter } from "@openknot-ts/error-reporting";
+import { reportError } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import { logger } from "@openknot-ts/logging/wire";
-import { config, resource, unit } from "@openknot-ts/wire";
-import type { Requirements, RequirementsOptions, ResolvedReferences, CancellationOptions } from "@openknot-ts/wire";
+import { config, optional, resource, unit } from "@openknot-ts/wire";
+import type {
+  CancellationOptions,
+  OptionalDependency,
+  Requirements,
+  RequirementsOptions,
+  ResolvedReferences,
+} from "@openknot-ts/wire";
 import { Connection } from "rabbitmq-client";
 import { z } from "zod";
 
@@ -29,6 +38,17 @@ export const rabbitErrors = unit({
     },
 });
 
+/** A failure no caller receives: written to `rabbitErrors`, and reported when the application binds a reporter. */
+export function rabbitFailures(
+  errors: (error: unknown) => void,
+  reporter: ErrorReporter | undefined,
+): (error: unknown) => void {
+  return (error) => {
+    errors(error);
+    reportError(reporter, { error, source: "openknot.rabbitmq", expected: false });
+  };
+}
+
 /** Owns the native connection returned by create, including every SDK option and inferred custom member. */
 export function rabbitClient<const R extends Requirements = {}, C extends Connection = Connection>(
   options: RequirementsOptions<R> & {
@@ -37,11 +57,17 @@ export function rabbitClient<const R extends Requirements = {}, C extends Connec
   },
 ) {
   return resource({
-    requirements: { ...options.requirements, __report: rabbitErrors } as R & { readonly __report: typeof rabbitErrors },
+    requirements: { ...options.requirements, __report: rabbitErrors, __reporter: optional(errorReporter) } as R & {
+      readonly __report: typeof rabbitErrors;
+      readonly __reporter: OptionalDependency<typeof errorReporter>;
+    },
     async initialize(dependencies, acquisition) {
       const { signal } = acquisition;
       signal.throwIfAborted();
-      const report = dependencies.__report as (error: unknown) => void;
+      const report = rabbitFailures(
+        dependencies.__report as (error: unknown) => void,
+        dependencies.__reporter as ErrorReporter | undefined,
+      );
       const timeoutMs = options.startupTimeoutMs?.(dependencies) ?? 10_000;
       if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 2_147_483_647) {
         throw new TypeError("Rabbit startup timeout must be a positive signed 32-bit integer.");

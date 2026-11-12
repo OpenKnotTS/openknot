@@ -28,16 +28,12 @@ export function createAdapterRuntime() {
     requirements: { carrier },
     factory: ({ carrier }) => createExecutionEnvironment(carrier),
   });
-  function host(
-    context: DefinitionAdapterContext,
-    uow: UnitOfWorkExecutor,
-    reporter: ErrorReporter | undefined,
-  ): InputHost {
+  function host(context: DefinitionAdapterContext, uow: UnitOfWorkExecutor, report: ErrorReporter): InputHost {
     const { tracing, logs } = uow;
     return {
       tracing,
       logs,
-      reporter,
+      report,
       get status(): string {
         return context.status;
       },

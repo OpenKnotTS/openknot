@@ -41,7 +41,8 @@ export interface InputHost {
   readonly stopping: AbortSignal;
   readonly tracing?: Tracing | undefined;
   readonly logs?: ExecutionLogs | undefined;
-  readonly reporter?: ErrorReporter | undefined;
+  /** Delivers a report to the application's error reporter, when one is bound. */
+  readonly report: ErrorReporter;
   /**
    * `root` is the port the scope executes: it acquires only the scoped resources that port may need. `bounded`
    * declares that `signal` aborts once the scope's execution completes, so that execution adopts it.

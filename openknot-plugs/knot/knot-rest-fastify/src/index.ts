@@ -1,7 +1,8 @@
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type { FastifyPlugin } from "@openknot-ts/fastify-server";
 import { fastifyPlugins } from "@openknot-ts/fastify-server";
 import type { RestBodyOptions } from "@openknot-ts/knot-rest";
-import { readJsonBody, restBodyLimit, restHeaders, restRouter } from "@openknot-ts/knot-rest";
+import { readJsonBody, restBodyLimit, restFailure, restHeaders, restRouter } from "@openknot-ts/knot-rest";
 import { providePlugs, unit } from "@openknot-ts/wire";
 import type { Requirements } from "@openknot-ts/wire";
 
@@ -11,9 +12,9 @@ export function fastifyRestPlugin<const R extends Requirements = {}>(
 ) {
   return unit({
     provides: fastifyPlugins,
-    requirements: { router: restRouter, limit: restBodyLimit(options) },
+    requirements: { router: restRouter, limit: restBodyLimit(options), failures: unattendedFailures },
     factory:
-      ({ router, limit }): FastifyPlugin =>
+      ({ router, limit, failures }): FastifyPlugin =>
       async (instance) => {
         // The router reads a body only for routes that take one, under its own limit, so Fastify leaves the stream unread.
         instance.removeAllContentTypeParsers();
@@ -32,14 +33,16 @@ export function fastifyRestPlugin<const R extends Requirements = {}>(
             status,
             headers: responseHeaders,
             body,
-          } = await router.handle({
-            method: request.method,
-            path: url.pathname,
-            query: url.searchParams,
-            headers,
-            readBody: () => readJsonBody(headers, request.raw, limit),
-            signal: client.signal,
-          });
+          } = await router
+            .handle({
+              method: request.method,
+              path: url.pathname,
+              query: url.searchParams,
+              headers,
+              readBody: () => readJsonBody(headers, request.raw, limit),
+              signal: client.signal,
+            })
+            .catch((failure: unknown) => restFailure(failures, failure));
           // A body the route did not read stays unread, so the connection cannot carry another request.
           const close = status === 413 || status === 415 ? { connection: "close" } : {};
           return reply

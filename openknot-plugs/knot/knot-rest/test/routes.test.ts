@@ -193,6 +193,19 @@ test("input, authentication and guard inputs are checked before the exposure run
   }
 });
 
+test("a router's own failure rejects to the host, while a failed execution answers 500", async () => {
+  const app = await start();
+  try {
+    const router = app.resolve(restRouter);
+    const reset = new Error("connection reset while reading");
+    await assert.rejects(router.handle(request("PUT", "/roles/r1", { body: reset })), (error) => error === reset);
+    const internal = await router.handle(request("POST", "/roles", { body: { name: "explode" }, headers: authorized }));
+    assert.deepEqual([internal.status, internal.body], [500, JSON.stringify({ type: "InternalError" })]);
+  } finally {
+    await app.stop();
+  }
+});
+
 test("errors answer through the route's map and framework defaults, without internal details", async () => {
   const app = await start();
   const router = app.resolve(restRouter);

@@ -33,15 +33,19 @@
     "example": "bun examples/rest.ts"
   },
   "peerDependencies": {
+    "@openknot-ts/error-reporting": "workspace:^",
     "@openknot-ts/knot-http-bun": "workspace:^",
     "@openknot-ts/knot-rest": "workspace:^",
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
   },
   "devDependencies": {
     "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/error-reporting": "workspace:*",
     "@openknot-ts/flow": "workspace:*",
     "@openknot-ts/knot-http-bun": "workspace:*",
     "@openknot-ts/knot-rest": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@types/bun": "catalog:",
     "@types/node": "catalog:bun",

@@ -1,10 +1,10 @@
 # OpenKnot error reporting
 
-`@openknot-ts/error-reporting` is OpenKnot's error reporting contract. Flow and plugs hand every failure that ends at a boundary to the application's reporter, such as Sentry. Without a bound reporter nothing is reported. Logging is not the reporter's job: failures are logged through the application's [logger](../logging/README.md) whether a reporter is bound or not. The package has no dependencies; its `/wire` entry uses `@openknot-ts/wire` and `@openknot-ts/logging`.
+`@openknot-ts/error-reporting` is OpenKnot's error reporting contract. Flow and plugs hand every failure that ends at a boundary to the application's reporter, such as Sentry. Installing it reports nothing: Flow and plugs need only its contract, as they need tracing's, and without a bound reporter `errorReports` does nothing. Logging is not the reporter's job: failures are logged through the application's [logger](../logging/README.md) whether a reporter is bound or not. The package has no dependencies; its `/wire` entry uses `@openknot-ts/wire` and `@openknot-ts/logging`.
 
 ```text
 Flow, plugs (where)          → ErrorReport { error, source, expected, reference?, attributes? }
-@openknot-ts/error-reporting → errorReporter contract, isReported, reportError
+@openknot-ts/error-reporting → errorReporter contract, errorReports, unattendedFailures, isReported
 implementation (plug)        → the native SDK, such as Sentry
 ```
 
@@ -17,7 +17,7 @@ implementation (plug)        → the native SDK, such as Sentry
 
 ## Implement and bind
 
-The optional `/wire` entry exports `errorReporter`, a `unit.contract<ErrorReporter>()` without an implementation of its own. Flow and plugs consume `optional(errorReporter)`; an implementation provides it:
+The optional `/wire` entry exports `errorReporter`, a `unit.contract<ErrorReporter>()` without an implementation of its own. Flow and plugs hand their reports to `errorReports`, which delivers them to the bound reporter; an implementation provides it:
 
 ```ts
 import type { ErrorReporter } from "@openknot-ts/error-reporting";
@@ -35,7 +35,7 @@ const tracker = unit({
 });
 ```
 
-A reporter is a function of an `ErrorReport`. `isReported(report, errors)` applies the usual selection: every unexpected failure, and the expected ones `errors` names, as an `error()` factory or any `{ is(error) }`. `reportError(reporter, report)` delivers a report when a reporter is bound, without letting a failing reporter fail the work that reported.
+A reporter is a function of an `ErrorReport`. `isReported(report, errors)` applies the usual selection: every unexpected failure, and the expected ones `errors` names, as an `error()` factory or any `{ is(error) }`. `errorReports` delivers a report when a reporter is bound, without letting a failing reporter fail the work that reported: the reporter's own failure is logged through the application's logger as `openknot.error-reporting failed`, with the error it was reporting.
 
 ## Failures no caller receives
 

@@ -1,6 +1,7 @@
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import { httpHandler } from "@openknot-ts/knot-http-node/handler";
 import type { RestBodyOptions, RestResponse } from "@openknot-ts/knot-rest";
-import { readJsonBody, restBodyLimit, restHeaders, restRouter } from "@openknot-ts/knot-rest";
+import { readJsonBody, restBodyLimit, restFailure, restHeaders, restRouter } from "@openknot-ts/knot-rest";
 import { providePlugs, unit } from "@openknot-ts/wire";
 import type { Requirements } from "@openknot-ts/wire";
 import type { RequestListener, ServerResponse } from "node:http";
@@ -16,8 +17,8 @@ export function nodeRestHandler<const R extends Requirements = {}>(
   options: RestBodyOptions<R> = {} as RestBodyOptions<R>,
 ) {
   return unit({
-    requirements: { router: restRouter, limit: restBodyLimit(options) },
-    factory: ({ router, limit }): RequestListener => {
+    requirements: { router: restRouter, limit: restBodyLimit(options), failures: unattendedFailures },
+    factory: ({ router, limit, failures }): RequestListener => {
       return (request, response) => {
         let url: URL;
         try {
@@ -45,7 +46,8 @@ export function nodeRestHandler<const R extends Requirements = {}>(
           })
           .then(
             (result) => write(response, result),
-            () => write(response, { status: 500 }),
+            // The router's own failure, which no execution logged: a native middleware need not pass it on.
+            (failure: unknown) => write(response, restFailure(failures, failure)),
           );
       };
     },

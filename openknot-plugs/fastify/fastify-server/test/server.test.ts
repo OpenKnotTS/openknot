@@ -1,5 +1,9 @@
 import type { FastifyPlugin, FastifyServer } from "../src/index.ts";
 import { fastifyHttp, fastifyHttpServer, fastifyPlugins, fastifyServer } from "../src/index.ts";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { LogRecord } from "@openknot-ts/logging";
+import { logging } from "@openknot-ts/logging/wire";
 import type { Definition } from "@openknot-ts/wire";
 import {
   composeModule,
@@ -53,6 +57,59 @@ test("the selected plugins join the host in module order and it stops listening 
     await app.stop();
   }
   assert.equal(server.listening, false);
+});
+
+test("a handler failure answered with a server error is logged and reported once, a client error is not", async () => {
+  const failure = new Error("private failure");
+  const records: LogRecord[] = [];
+  const reports: ErrorReport[] = [];
+  const routes = unit({
+    provides: fastifyPlugins,
+    factory: (): FastifyPlugin => async (instance) => {
+      instance.get("/fails", async () => {
+        throw failure;
+      });
+      instance.get("/rejects", async () => {
+        throw Object.assign(new Error("bad request"), { statusCode: 400 });
+      });
+    },
+  });
+  const app = await runApplication(
+    defineApplication({
+      modules: [
+        fastifyHttp,
+        providePlugs([routes]),
+        composeModule({
+          providers: {
+            recorded: unit({
+              provides: logging,
+              factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+            }),
+            reporter: unit({
+              provides: errorReporter,
+              factory: () => (report: ErrorReport) => void reports.push(report),
+            }),
+          },
+        }),
+      ],
+    }),
+    { env, stopOn: [] },
+  );
+  try {
+    const { url } = app.resolve(fastifyServer);
+    assert.equal((await fetch(`${url}/fails`)).status, 500);
+    assert.equal((await fetch(`${url}/rejects`)).status, 400);
+    assert.deepEqual(
+      records.map((record) => [record.level, record.message, record.attributes.error]),
+      [["error", "openknot.http failed", failure]],
+    );
+    assert.deepEqual(
+      reports.map((report) => [report.error, report.source, report.expected]),
+      [[failure, "openknot.http", false]],
+    );
+  } finally {
+    await app.stop();
+  }
 });
 
 test("the host starts after what its plugins use and drains admitted requests before that closes", async (t) => {

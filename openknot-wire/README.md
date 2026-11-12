@@ -176,7 +176,7 @@ export const httpConfig = config({
 });
 ```
 
-- `runApplication()` validates every reachable config from `process.env`, or from `{ env }`, before any resource starts. All invalid variables are reported together, by name and without their values.
+- `runApplication()` validates every config a registered definition may resolve, a definition outside the selected roots included, from `process.env`, or from `{ env }`, before any resource starts. All invalid variables are reported together, by name and without their values.
 - Each variable has one owning config; two owners fail startup.
 - `describeApplication()` lists the variables the application reads. Load `.env` files with `node --env-file-if-exists=.env`.
 - Never supply settings through `override()`.

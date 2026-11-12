@@ -33,7 +33,9 @@
   },
   "peerDependencies": {
     "@openknot-ts/behavior": "workspace:^",
+    "@openknot-ts/error-reporting": "workspace:^",
     "@openknot-ts/flow": "workspace:^",
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/tracing": "workspace:^",
     "@openknot-ts/versioning": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
@@ -44,7 +46,9 @@
   },
   "devDependencies": {
     "@openknot-ts/behavior": "workspace:*",
+    "@openknot-ts/error-reporting": "workspace:*",
     "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/tracing": "workspace:*",
     "@openknot-ts/versioning": "workspace:*",
     "@openknot-ts/wire": "workspace:*",

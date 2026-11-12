@@ -1,6 +1,6 @@
 import type { ErrorReport } from "../src/index.ts";
-import { isReported, reportError } from "../src/index.ts";
-import { errorReporter, unattendedFailures } from "../src/wire.ts";
+import { isReported } from "../src/index.ts";
+import { errorReporter, errorReports, unattendedFailures } from "../src/wire.ts";
 import { error } from "@openknot-ts/behavior";
 import type { LogRecord } from "@openknot-ts/logging";
 import { logging } from "@openknot-ts/logging/wire";
@@ -27,15 +27,32 @@ test("a custom kind selects expected failures by any rule", () => {
   assert.equal(isReported(report(new RangeError("bad"), true), [typeErrors]), false);
 });
 
-test("a failing reporter never fails the work that reports", (t) => {
-  t.mock.method(console, "error", () => undefined);
-  assert.doesNotThrow(() =>
-    reportError(
-      () => {
-        throw new Error("reporter down");
-      },
-      report(new Error("crash"), false),
-    ),
+test("a failing reporter never fails the work that reports, and its failure is logged", async () => {
+  const records: LogRecord[] = [];
+  const crash = new Error("crash");
+  const down = new Error("reporter down");
+  const recorded = unit({
+    provides: logging,
+    factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+  });
+  const reporter = unit({
+    provides: errorReporter,
+    factory: () => () => {
+      throw down;
+    },
+  });
+  const app = await runApplication(
+    defineApplication({ modules: [composeModule({ providers: { reports: errorReports, recorded, reporter } })] }),
+    { env: {} },
+  );
+  try {
+    assert.doesNotThrow(() => app.resolve(errorReports)(report(crash, false)));
+  } finally {
+    await app.stop();
+  }
+  assert.deepEqual(
+    records.map((record) => [record.level, record.message, record.attributes]),
+    [["error", "openknot.error-reporting failed", { error: down, reported: crash }]],
   );
 });
 

@@ -30,18 +30,3 @@ export type UnattendedFailures = (failure: UnattendedFailure) => void;
 export function isReported(report: ErrorReport, errors: readonly ErrorKind[] = []): boolean {
   return !report.expected || errors.some((kind) => kind.is(report.error));
 }
-
-/**
- * Delivers a report to the application's reporter, when one is bound. Reporting never fails the work that reports: a
- * reporter's own failure goes to the console with the report.
- */
-export function reportError(reporter: ErrorReporter | undefined, report: ErrorReport): void {
-  if (reporter === undefined) {
-    return;
-  }
-  try {
-    reporter(report);
-  } catch (failure) {
-    console.error("[openknot/error-reporting] The error reporter failed", failure, report.error);
-  }
-}

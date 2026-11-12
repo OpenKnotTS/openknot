@@ -1,3 +1,5 @@
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
+import { unattendedFailures } from "@openknot-ts/error-reporting/wire";
 import type {
   CancellationOptions,
   ManagedResource,
@@ -17,6 +19,7 @@ import type {
   RawServerBase,
 } from "fastify";
 import fastify from "fastify";
+import fastifyPlugin from "fastify-plugin";
 import { ServerResponse } from "node:http";
 import type { IncomingMessage } from "node:http";
 import type { Http2ServerRequest, Http2ServerResponse } from "node:http2";
@@ -46,6 +49,23 @@ type NativeFastify = Pick<FastifyInstance, "listen" | "close" | "listeningOrigin
   readonly register: FastifyRegister<unknown>;
 };
 
+/**
+ * A failure Fastify answers with a server error, as it answers one without a client status, fails only its request: the
+ * host logs and reports it, since Fastify's own logger is off unless the application enables it.
+ */
+function failureReporting(failures: UnattendedFailures): FastifyPlugin {
+  return fastifyPlugin((instance, _options, done) => {
+    instance.addHook("onError", (_request, _reply, error, next) => {
+      const status = (error as { readonly statusCode?: unknown }).statusCode;
+      if (typeof status !== "number" || status < 400 || status >= 500) {
+        failures({ error, source: "openknot.http" });
+      }
+      next();
+    });
+    done();
+  });
+}
+
 export interface FastifyServer<Instance extends NativeFastify = FastifyInstance> {
   /** The native instance, for its routes, decorators, hooks and server. */
   readonly native: Instance;
@@ -57,6 +77,7 @@ export interface FastifyServer<Instance extends NativeFastify = FastifyInstance>
 type Listen<R extends Requirements> = (dependencies: ResolvedReferences<R>) => FastifyListenOptions;
 type ServerRequirements<R extends Requirements, Default extends boolean> = R & {
   readonly __plugins: typeof fastifyPlugins;
+  readonly __failures: typeof unattendedFailures;
 } & (Default extends true ? { readonly __listenConfig: typeof fastifyHttpConfig } : {});
 
 export type FastifyHttpServer<
@@ -74,6 +95,7 @@ async function listenFastify<Instance extends NativeFastify>(
   instance: Instance,
   plugins: readonly FastifyPlugin[],
   options: FastifyListenOptions,
+  failures: UnattendedFailures,
   { signal }: CancellationOptions,
 ): Promise<ResourceHandle<FastifyServer<Instance>>> {
   let stopping = false;
@@ -111,7 +133,7 @@ async function listenFastify<Instance extends NativeFastify>(
   signal.addEventListener("abort", cancel, { once: true });
 
   try {
-    for (const plugin of plugins) {
+    for (const plugin of [failureReporting(failures), ...plugins]) {
       signal.throwIfAborted();
       await instance.register(plugin);
     }
@@ -170,6 +192,7 @@ export function fastifyHttpServer<const R extends Requirements = {}, Instance ex
     ...(options.listen === undefined ? { __listenConfig: fastifyHttpConfig } : {}),
     ...options.requirements,
     __plugins: fastifyPlugins,
+    __failures: unattendedFailures,
   } as ServerRequirements<R, boolean>;
   return resource({
     requirements,
@@ -178,7 +201,8 @@ export function fastifyHttpServer<const R extends Requirements = {}, Instance ex
       const listening =
         options.listen === undefined ? { port: settings.PORT, host: settings.HTTP_HOST } : options.listen(dependencies);
       const plugins = dependencies.__plugins as readonly FastifyPlugin[];
-      return listenFastify(options.create(dependencies), plugins, listening, acquisition);
+      const failures = dependencies.__failures as UnattendedFailures;
+      return listenFastify(options.create(dependencies), plugins, listening, failures, acquisition);
     },
   });
 }

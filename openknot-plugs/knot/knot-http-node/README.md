@@ -74,7 +74,7 @@ Select it with `providePlugs([server])` instead of `http`. Several hosts can run
 
 Middleware units that provide `httpMiddleware` run in module order before the handler. Each receives the native `(request, response, next)`, may answer or `return next()`, and keeps the server as `this`. A middleware reached only as a dependency does not join the pipeline. [`@openknot-ts/knot-health`](../knot-health/README.md) uses this contract: select its `healthHttp` module to serve `/livez`, `/readyz` and `/health`.
 
-A handler or middleware that throws fails only its own request: the host logs it and answers 500, or closes the connection if headers were already sent.
+A handler or middleware that throws fails only its own request: the host hands the failure to `unattendedFailures`, which logs it and reports it when a reporter is bound, and answers 500, or closes the connection if headers were already sent. A handler answers the failures of the executions it invokes, as `trpcHttp` and `restRouter` do: Flow has already logged and reported them, so one it lets through is logged and reported twice.
 
 ## Lifecycle
 

@@ -59,6 +59,8 @@ The route's Standard Schema `input` validates each request once, as tRPC's `.inp
 | `InputUnavailableError`: the application is stopping | 503 | none |
 | any other failure | 500 | `{ type: "InternalError" }` |
 
+A failed execution is logged and reported by Flow. A failure of the router's own, such as an output its schema rejects or a mapping that fails, rejects `handle()`, and the adapter answers it through `restFailure`, which logs and reports it once through `unattendedFailures`.
+
 ## Responses
 
 The body is the exposure's value as JSON. `status` defaults to 200; `undefined` answers 204. An optional `output` schema encodes the response. Each request carries the client's signal, the actor, trace propagation from the request headers and the `http.request.method` and `http.route` attributes.
@@ -67,7 +69,8 @@ The body is the exposure's value as JSON. `status` defaults to 200; `undefined` 
 
 | Export | Description |
 | --- | --- |
-| `restRouter` | The merged router: `handle({ method, path, query, headers, readBody, signal })` resolves to `{ status, headers?, body? }`. |
+| `restRouter` | The merged router: `handle({ method, path, query, headers, readBody, signal })` resolves to `{ status, headers?, body? }`, and rejects with a failure of its own. |
+| `restFailure(failures, failure)` | The 500 an adapter answers when `handle()` rejects, after handing the failure to `unattendedFailures`. |
 | `readJsonBody(headers, chunks, limit)` | Checks the content type and length, then reads the native byte stream up to the limit. Rejects with `RestBodyError(400 \| 413 \| 415, message)`. |
 | `restHeaders(request.headers)` | Header lookup over a Node-style header record. |
 | `restBodyLimit({ requirements?, maxBodySize? })`, `RestBodyOptions` | The body limit: `REST_MAX_BODY_SIZE` (bytes, default 1 MiB, from `restConfig`) unless `maxBodySize` selects another value. |

@@ -4,16 +4,15 @@ import type { InputHost } from "./runtime.ts";
 import { isDefect } from "./safety.ts";
 import type { ExecutionTrace } from "./tracing.ts";
 import type { Outcome } from "@openknot-ts/behavior";
-import { reportError } from "@openknot-ts/error-reporting";
 
-type Observer = Pick<InputHost, "tracing" | "logs" | "reporter">;
+type Observer = Pick<InputHost, "tracing" | "logs" | "report">;
 
 /** An input's failure, for the application's reporter when one is bound; the caller's own cancellation is none. */
 function report(host: Observer, operation: ExecutionTrace, error: Error): void {
   if (InputCancelledError.is(error)) {
     return;
   }
-  reportError(host.reporter, {
+  host.report({
     error,
     source: `openknot.${operation.kind}`,
     expected: !isDefect(error),

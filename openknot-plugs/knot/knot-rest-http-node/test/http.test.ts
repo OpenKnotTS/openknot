@@ -1,10 +1,14 @@
 import { nodeRestHandler, restNodeHttp } from "../src/index.ts";
 import { error, failure, success } from "@openknot-ts/behavior";
+import type { ErrorReport } from "@openknot-ts/error-reporting";
+import { errorReporter } from "@openknot-ts/error-reporting/wire";
 import { command, expose, publisher, query } from "@openknot-ts/flow";
 import { provideFlow } from "@openknot-ts/flow/wire";
 import { http, httpServer, nodeHttpServer } from "@openknot-ts/knot-http-node";
 import { restRoutes } from "@openknot-ts/knot-rest";
-import { config, defineApplication, plug, providePlugs, runApplication } from "@openknot-ts/wire";
+import type { LogRecord } from "@openknot-ts/logging";
+import { logging } from "@openknot-ts/logging/wire";
+import { composeModule, config, defineApplication, plug, providePlugs, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { z } from "zod";
@@ -135,6 +139,57 @@ test("the Node host serves REST routes with native bodies, limits and status cod
     );
     const large = await send(`${url}/roles`, JSON.stringify({ name: "x".repeat(100) }));
     assert.equal(large.status, 413);
+  } finally {
+    await app.stop();
+  }
+});
+
+test("a route's own failure answers 500 and is logged and reported once", async () => {
+  const describeRole = expose({
+    handler: query<{ readonly id: string }, object>()({ run: (input) => success(input) }),
+  });
+  const strictRoutes = restRoutes({
+    port: expose.compose({ describeRole }),
+    routes: {
+      describeRole: { get: "/strict/:id", input: z.object({ id: z.string() }), output: z.object({ id: z.number() }) },
+    },
+  });
+  const records: LogRecord[] = [];
+  const reports: ErrorReport[] = [];
+  const app = await runApplication(
+    defineApplication({
+      modules: [
+        http,
+        restNodeHttp,
+        provideFlow([describeRole]),
+        providePlugs([strictRoutes]),
+        composeModule({
+          providers: {
+            recorded: unit({
+              provides: logging,
+              factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+            }),
+            reporter: unit({
+              provides: errorReporter,
+              factory: () => (report: ErrorReport) => void reports.push(report),
+            }),
+          },
+        }),
+      ],
+    }),
+    { env: { PORT: "0" }, stopOn: [] },
+  );
+  try {
+    const response = await fetch(`${app.resolve(httpServer).url}/strict/r1`);
+    assert.equal(response.status, 500);
+    assert.deepEqual(
+      records.filter((record) => record.level === "error").map((record) => record.message),
+      ["openknot.rest failed"],
+    );
+    assert.deepEqual(
+      reports.map((report) => [report.source, report.expected]),
+      [["openknot.rest", false]],
+    );
   } finally {
     await app.stop();
   }

@@ -33,14 +33,19 @@
     "example": "node examples/fastify.ts"
   },
   "peerDependencies": {
+    "@openknot-ts/error-reporting": "workspace:^",
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/wire": "workspace:^",
     "fastify": ">=5 <6"
   },
   "dependencies": {
+    "fastify-plugin": "^5.1.0",
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@openknot-ts/error-reporting": "workspace:*",
     "@openknot-ts/knot-http-node": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@types/node": "catalog:",
     "fastify": "catalog:",

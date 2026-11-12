@@ -24,7 +24,7 @@ function level(fallback: LogLevel | undefined) {
 
 /**
  * Every execution starts at an input, so no failure stays silent: an exposure or subscription returns its failures to
- * a caller, whose transport reports a defect without logging it; a listener or scheduler has no caller at all.
+ * a caller, whose transport answers a defect without logging it; a listener or scheduler has no caller at all.
  */
 const called = level("error");
 const unattended = level("warn");

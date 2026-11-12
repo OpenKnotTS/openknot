@@ -176,8 +176,29 @@ export function validateGraph(
     visit(identity, labelOf(identity));
   }
 
-  // Reachable configs are read at startup; each environment variable has one owning config.
-  const configs = [...paths.keys()].filter(
+  // Every config a registered definition may resolve is read at startup, also one a definition resolved only on demand
+  // or through a deferred reference reaches, so no resolution finds it unread. An overridden definition is a value that
+  // resolves nothing, so a config only it requires is not read; each environment variable has one owning config.
+  const reached = new Set<object>();
+  const pending = [...providers.keys()].filter((identity) => !isConfig(identity));
+
+  for (let identity = pending.pop(); identity !== undefined; identity = pending.pop()) {
+    if (reached.has(identity)) {
+      continue;
+    }
+    reached.add(identity);
+    if (overrides.has(identity)) {
+      continue;
+    }
+    for (const edge of [...(edges.get(identity) ?? []), ...wrapperEdges(identity), ...(deferred.get(identity) ?? [])]) {
+      if (edge.identity !== undefined) {
+        pending.push(edge.identity);
+      }
+    }
+  }
+
+  // The roots' configs include one an application lists without a definition requiring it.
+  const configs = [...new Set([...paths.keys(), ...reached])].filter(
     (identity): identity is Config => isConfig(identity) && !overrides.has(identity),
   );
 

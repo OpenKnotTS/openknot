@@ -814,13 +814,22 @@ importers:
 
   openknot-plugs/fastify/fastify-server:
     dependencies:
+      fastify-plugin:
+        specifier: ^5.1.0
+        version: 5.1.0
       zod:
         specifier: 'catalog:'
         version: 4.6.7
     devDependencies:
+      '@openknot-ts/error-reporting':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/error-reporting
       '@openknot-ts/knot-http-node':
         specifier: workspace:*
         version: link:../../knot/knot-http-node
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../../openknot-wire
@@ -1008,9 +1017,15 @@ importers:
       '@openknot-ts/behavior':
         specifier: workspace:*
         version: link:../../../openknot-behavior
+      '@openknot-ts/error-reporting':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/error-reporting
       '@openknot-ts/flow':
         specifier: workspace:*
         version: link:../../../openknot-flow
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/tracing':
         specifier: workspace:*
         version: link:../../../openknot-capabilities/tracing
@@ -1032,6 +1047,9 @@ importers:
       '@openknot-ts/behavior':
         specifier: workspace:*
         version: link:../../../openknot-behavior
+      '@openknot-ts/error-reporting':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/error-reporting
       '@openknot-ts/fastify-server':
         specifier: workspace:*
         version: link:../../fastify/fastify-server
@@ -1041,6 +1059,9 @@ importers:
       '@openknot-ts/knot-rest':
         specifier: workspace:*
         version: link:../knot-rest
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../../openknot-wire
@@ -1062,6 +1083,9 @@ importers:
       '@openknot-ts/behavior':
         specifier: workspace:*
         version: link:../../../openknot-behavior
+      '@openknot-ts/error-reporting':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/error-reporting
       '@openknot-ts/flow':
         specifier: workspace:*
         version: link:../../../openknot-flow
@@ -1071,6 +1095,9 @@ importers:
       '@openknot-ts/knot-rest':
         specifier: workspace:*
         version: link:../knot-rest
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../../openknot-wire
@@ -1092,6 +1119,9 @@ importers:
       '@openknot-ts/behavior':
         specifier: workspace:*
         version: link:../../../openknot-behavior
+      '@openknot-ts/error-reporting':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/error-reporting
       '@openknot-ts/flow':
         specifier: workspace:*
         version: link:../../../openknot-flow
@@ -1101,6 +1131,9 @@ importers:
       '@openknot-ts/knot-rest':
         specifier: workspace:*
         version: link:../knot-rest
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../../openknot-wire
@@ -2526,6 +2559,9 @@ packages:
   fast-uri@4.1.4:
     resolution: {integrity: sha512-dODXrIxlS9JSdgAnhIUKOosKV1oMtU2VtVw87QRaHzyl5jxO290Ii5tEZfCfzfWNHi3jKWwBSdQj0qIyshdZdQ==}
 
+  fastify-plugin@5.1.0:
+    resolution: {integrity: sha512-FAIDA8eovSt5qcDgcBvDuX/v0Cjz0ohGhENZ/wpc3y+oZCY2afZ9Baqql3g/lC+OHRnciQol4ww7tuthOb9idw==}
+
   fastify@5.12.7:
     resolution: {integrity: sha512-v4pEPsTRPuqlDIYiQFB+BHjVN4SdHX9u0ABk0ZDUKbbdY1vsNryUd1j4Z+jQEZajvYIVk047Kimva9/AJ79GYw==}
 
@@ -3363,6 +3399,8 @@ snapshots:
   fast-uri@3.1.7: {}
 
   fast-uri@4.1.4: {}
+
+  fastify-plugin@5.1.0: {}
 
   fastify@5.12.7:
     dependencies:

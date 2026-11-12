@@ -88,6 +88,7 @@ Units that provide `httpMiddleware` run in module order and return a response or
 
 ## Lifecycle
 
+- A handler or middleware that throws fails only its own request: the host hands the failure to `unattendedFailures`, which logs it and reports it when a reporter is bound, and answers 500 unless a native `error` option answers it. A handler answers the failures of the executions it invokes, as `trpcHttp` and `restRouter` do: Flow has already logged and reported them, so one it lets through is logged and reported twice.
 - `Bun.serve()` listens when constructed, inside the resource's `initialize`, so `native` is available from then on. Missing handlers and invalid configuration fail before acquisition; bind failures and cancelled startups unwind.
 - `url` is the bound URL with a trailing slash; build paths with `new URL("/path", server.url)`.
 - `app.stop()` awaits native `server.stop()`, which waits for active responses. Open WebSockets are closed with 1001 (going away). Other indefinite streams end in shutdown tasks.

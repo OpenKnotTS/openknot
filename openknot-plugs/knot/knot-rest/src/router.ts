@@ -1,6 +1,7 @@
 import type { CompiledRoute, RestHeaders, RouteRequest } from "./routes.ts";
 import { declaredRestRoutes } from "./routes.ts";
 import { error } from "@openknot-ts/behavior";
+import type { UnattendedFailures } from "@openknot-ts/error-reporting";
 import { ActorAuthenticationError, InputCancelledError, InputUnavailableError } from "@openknot-ts/flow";
 import { propagationFields } from "@openknot-ts/tracing";
 import { VersionConflict } from "@openknot-ts/versioning";
@@ -284,14 +285,20 @@ async function respond(
   const view: RouteRequest = { params, query, headers: request.headers };
   const actor = await actorOf(route, request);
   const input = route.input === undefined ? undefined : await inputOf(route, route.input, params, query, request);
-  let value = await route.invoke({
+  const invocation = {
     ...route.guards?.(view),
     input,
     signal: request.signal,
     actor,
     propagation: propagationOf(route, request.headers),
     traceAttributes: { "http.request.method": route.method, "http.route": route.path },
-  });
+  };
+  let value: unknown;
+  try {
+    value = await route.invoke(invocation);
+  } catch (cause) {
+    return failed(route, cause, true);
+  }
   if (route.output !== undefined) {
     const result = await route.output["~standard"].validate(value);
     if (result.issues !== undefined) {
@@ -302,7 +309,8 @@ async function respond(
   return value === undefined ? { status: 204 } : json(route.status, value);
 }
 
-function failed(route: CompiledRoute, cause: unknown): RestResponse {
+/** The response a route or the framework maps a failure to; undefined for one neither maps. */
+function mapped(route: CompiledRoute, cause: unknown): RestResponse | undefined {
   if (RestBodyError.is(cause)) {
     return cause.status === 400
       ? json(400, { type: "InvalidInput", message: cause.message })
@@ -336,6 +344,31 @@ function failed(route: CompiledRoute, cause: unknown): RestResponse {
     }
     return body === undefined ? { status } : json(status, body);
   }
+  return undefined;
+}
+
+/**
+ * Answers a failure the route or the framework maps. An unmapped failure of the execution answers 500, since Flow has
+ * logged and reported it; the router's own, such as an output its schema rejects, or a mapping that fails, rejects to
+ * the host, which logs, reports and answers it.
+ */
+function failed(route: CompiledRoute, cause: unknown, executed: boolean): RestResponse {
+  const response = mapped(route, cause);
+  if (response !== undefined) {
+    return response;
+  }
+  if (executed) {
+    return json(500, { type: "InternalError" });
+  }
+  throw cause;
+}
+
+/**
+ * What an adapter answers when `handle()` rejects: the router's own failure, which no execution logged, goes to
+ * `unattendedFailures` and answers 500.
+ */
+export function restFailure(failures: UnattendedFailures, failure: unknown): RestResponse {
+  failures({ error: failure, source: "openknot.rest" });
   return json(500, { type: "InternalError" });
 }
 
@@ -366,11 +399,7 @@ function createRouter(routes: readonly CompiledRoute[]): RestRouter {
       try {
         return await respond(route, match.params, request);
       } catch (cause) {
-        try {
-          return failed(route, cause);
-        } catch {
-          return json(500, { type: "InternalError" });
-        }
+        return failed(route, cause, false);
       }
     },
   });

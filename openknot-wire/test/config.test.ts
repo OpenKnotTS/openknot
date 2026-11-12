@@ -65,6 +65,29 @@ test("config reads its variables from the environment through schemas or parse f
   }
 });
 
+test("a config only a definition outside the roots reaches is read and checked at startup", async () => {
+  const retryConfig = config({ RETRIES: integer(3) });
+  const retries = unit({ requirements: { retryConfig }, factory: ({ retryConfig }) => retryConfig.RETRIES });
+  const status = unit({ factory: () => "up" });
+  const definition = defineApplication({
+    modules: [composeModule({ providers: { status, retries } }).includeOnly([status])],
+  });
+  const app = await runApplication(definition, { env: { RETRIES: "5" } });
+  try {
+    assert.equal(app.resolve(retries), 5);
+  } finally {
+    await app.stop();
+  }
+  await assert.rejects(runApplication(definition, { env: { RETRIES: "many" } }), /RETRIES/);
+  // An overridden definition resolves nothing, so a config only it requires is not read.
+  const stubbed = await runApplication(definition, { env: { RETRIES: "many" }, overrides: [override(retries, 1)] });
+  try {
+    assert.equal(stubbed.resolve(retries), 1);
+  } finally {
+    await stubbed.stop();
+  }
+});
+
 test("invalid variables stop startup before any resource, reported together without their values", async () => {
   let acquisitions = 0;
   const credentials = config({

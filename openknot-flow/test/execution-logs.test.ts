@@ -1,11 +1,27 @@
 import type { InputInvoker } from "../src/index.ts";
-import { command, expose, InputUnavailableError, InternalFlowError, listener, query } from "../src/index.ts";
+import {
+  command,
+  expose,
+  InputUnavailableError,
+  InternalFlowError,
+  listener,
+  PostCommitError,
+  query,
+} from "../src/index.ts";
 import { provideFlow } from "../src/wire.ts";
 import { error, failure, success } from "@openknot-ts/behavior";
 import type { LogRecord } from "@openknot-ts/logging";
 import { logging } from "@openknot-ts/logging/wire";
 import type { Environment } from "@openknot-ts/wire";
-import { composeModule, defineApplication, plug, providePlugs, runApplication, unit } from "@openknot-ts/wire";
+import {
+  composeModule,
+  defineApplication,
+  plug,
+  providePlugs,
+  resource,
+  runApplication,
+  unit,
+} from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
@@ -198,6 +214,44 @@ test("an input logs every request it refuses before any execution, and an invoca
       error: "Invalid messageId",
     },
     ...Array.from({ length: 4 }, () => ({ ...refused, errorType: "InputUnavailableError" })),
+  ]);
+});
+
+test("by default a defect after an exposure succeeded, as its scope failing to release, is written with the error", async () => {
+  const records: LogRecord[] = [];
+  const recorded = unit({
+    provides: logging,
+    factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+  });
+  const session = resource({
+    lifetime: "scoped",
+    initialize: async () => ({
+      value: {},
+      release() {
+        throw new Error("connection release failed");
+      },
+    }),
+  });
+  const change = command<boolean>()({ requirements: { session }, run: () => success() });
+  const api = expose({ tag: "roles.change", handler: change });
+  const app = await runApplication(
+    defineApplication({ modules: [provideFlow([api]), composeModule({ providers: { recorded } })] }),
+    { env: {} },
+  );
+  try {
+    await assert.rejects(app.resolve(api)({ input: true }), PostCommitError.is);
+  } finally {
+    await app.stop();
+  }
+  assert.deepEqual(records.map(summary), [
+    {
+      level: "error",
+      message: "expose roles.change failed",
+      kind: "expose",
+      tag: "roles.change",
+      errorType: "PostCommitError",
+      error: "Scope cleanup failed.",
+    },
   ]);
 });
 

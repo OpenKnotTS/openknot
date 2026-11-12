@@ -1,8 +1,8 @@
-import { InputUnavailableError, InternalFlowError } from "../errors.ts";
+import { InputUnavailableError } from "../errors.ts";
+import { isDefect } from "./safety.ts";
 import { tagOf } from "./tag.ts";
 import type { ExecutionTrace, ExecutionTraceKind } from "./tracing.ts";
 import { outcomeError, traceExecution } from "./tracing.ts";
-import { InternalBehaviorError } from "@openknot-ts/behavior";
 import type { LogAttributes, LogLevel, Logger, Logging } from "@openknot-ts/logging";
 import { createLogger } from "@openknot-ts/logging";
 import type { Tracing } from "@openknot-ts/tracing";
@@ -36,11 +36,6 @@ function errorType(error: unknown): unknown {
     return error.type;
   }
   return error instanceof Error ? error.name : typeof error;
-}
-
-/** A defect the framework classified, as opposed to a failure the application returned or a cancellation. */
-function internal(error: unknown): boolean {
-  return InternalFlowError.is(error) || InternalBehaviorError.is(error);
 }
 
 /** A record names its operation by kind and tag, as `command role.rename`, and carries both as attributes. */
@@ -96,7 +91,7 @@ function logFailure(
   attributes: (added: LogAttributes) => LogAttributes,
   failure: unknown,
 ): void {
-  if (internal(failure)) {
+  if (isDefect(failure)) {
     logger.error(message, attributes({ errorType: errorType(failure), error: failure }));
   } else {
     logger.warn(message, attributes({ errorType: errorType(failure) }));

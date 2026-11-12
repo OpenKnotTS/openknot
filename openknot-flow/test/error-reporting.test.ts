@@ -14,6 +14,8 @@ import { rejection } from "./fixtures/rejection.ts";
 import { error, failure, success } from "@openknot-ts/behavior";
 import type { ErrorReport } from "@openknot-ts/error-reporting";
 import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { LogRecord } from "@openknot-ts/logging";
+import { logging } from "@openknot-ts/logging/wire";
 import { composeModule, defineApplication, plug, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { test } from "node:test";
@@ -152,4 +154,38 @@ test("a failed subscription admission is reported once with its port", async () 
   } finally {
     await app.stop();
   }
+});
+
+test("a subscription refused before its admission is logged and reported once", async () => {
+  const feed = broadcast<string>()({});
+  const native = plug({
+    port: feed,
+    bind: () => ({
+      publish: () => undefined,
+      subscribe: () => {
+        throw new Error("no admission runs");
+      },
+    }),
+  });
+  const records: LogRecord[] = [];
+  const recorded = unit({
+    provides: logging,
+    factory: () => ({ write: (record: LogRecord) => void records.push(record) }),
+  });
+  const { reports, binding } = recording();
+  const app = await runApplication(
+    defineApplication({ modules: [composeModule({ providers: { feed, native, binding, recorded } })] }),
+    { env: { LOG_LEVEL_SUBSCRIBE: "warn" } },
+  );
+  const subscriptions = app.resolve(feed);
+  await app.stop();
+  assert.ok(InputUnavailableError.is(await rejection(subscriptions.subscribe({ input: undefined }))));
+  assert.deepEqual(
+    records.map((record) => [record.level, record.message]),
+    [["warn", "subscribe not admitted"]],
+  );
+  assert.deepEqual(
+    reports.map((report) => [report.source, report.expected]),
+    [["openknot.subscribe", true]],
+  );
 });

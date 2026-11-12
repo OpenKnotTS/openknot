@@ -15,11 +15,10 @@ import type { ExecutionLifetime } from "./cancellation.ts";
 import { executionLifetime } from "./cancellation.ts";
 import { addCheckpoints, portKeys } from "./checkpoint.ts";
 import type { ExecutionLogs } from "./execution-logs.ts";
-import { logRefusal, observeExecution } from "./execution-logs.ts";
 import type { ExecutionEnvironment } from "./execution-runtime.ts";
 import type { RuntimeGuard } from "./guard-execution.ts";
 import { guardAdmission } from "./guard-execution.ts";
-import { reportFailure } from "./reporting.ts";
+import { observeInput, refuseInput } from "./input-observation.ts";
 import { executionOptions, ownField, requireRequest } from "./request.ts";
 import { cleanupError, executionError, requireSuccess } from "./safety.ts";
 import type { Outcome } from "@openknot-ts/behavior";
@@ -232,25 +231,17 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
           // From here the execution's own record covers the outcome. Its span also covers the classified result, so
           // the failure is reported while the span is active.
           observed = true;
-          return await observeExecution(
-            host.tracing,
-            host.logs,
+          return await observeInput(
+            host,
             { ...operation, propagation: options.propagation, attributes: traceAttributes },
-            async () => {
-              const settled = await settle();
-              if (settled.isError) {
-                reportFailure(host.reporter, operation, settled.error, traceAttributes);
-              }
-              return settled;
-            },
+            settle,
           );
         },
         (error) => executionError(error, signal),
       );
       // A request refused before its execution ran has no record or span of its own.
       if (!observed && "isError" in result && result.isError) {
-        logRefusal(host.logs, operation, result.error);
-        reportFailure(host.reporter, operation, result.error);
+        refuseInput(host, operation, result.error);
       }
       return result;
     } finally {
@@ -269,8 +260,7 @@ export function createInputInvoker(port: InputPortDefinition, host: InputHost): 
     return pending;
   };
   const refuse = (error: Error): Promise<never> => {
-    logRefusal(host.logs, operation, error);
-    reportFailure(host.reporter, operation, error);
+    refuseInput(host, operation, error);
     return handled(Promise.reject(error));
   };
 

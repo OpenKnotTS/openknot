@@ -46,6 +46,16 @@ export function isClassified(error: unknown): error is FlowExecutionError {
   return flowErrors.some((kind) => kind.is(error));
 }
 
+const defects = [InternalBehaviorError, InternalFlowError, UnitOfWorkError, PostCommitError];
+
+/**
+ * A failure no business rule anticipates, as opposed to an authored failure, a version conflict or a cancellation: an
+ * execution log writes it at `error` with the error itself, and an error reporter receives it as unexpected.
+ */
+export function isDefect(error: unknown): boolean {
+  return defects.some((kind) => kind.is(error));
+}
+
 /**
  * A plug's failure is infrastructure for the execution that called it: a classified Flow error it carries belongs to
  * another execution, so it becomes this one's internal failure. `VersionConflict` is the versioning contract's own

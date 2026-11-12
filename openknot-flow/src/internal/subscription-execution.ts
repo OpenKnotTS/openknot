@@ -2,11 +2,10 @@ import { InputCancelledError, InputUnavailableError } from "../errors.ts";
 import type { ExecutionOptions } from "../execution.ts";
 import type { GuardRequest } from "../guard.ts";
 import type { SubscriptionDefinition, NativeSubscription, DeliveryOptions } from "../subscription.ts";
-import { observeExecution } from "./execution-logs.ts";
 import type { RuntimeGuard } from "./guard-execution.ts";
 import { guardAdmission } from "./guard-execution.ts";
+import { observeInput, refuseInput } from "./input-observation.ts";
 import { optionsIndex } from "./publication.ts";
-import { reportFailure } from "./reporting.ts";
 import { executionOptions, ownField, requireRequest } from "./request.ts";
 import type { InputHost, RuntimeScope } from "./runtime.ts";
 import { cleanupError, executionError, requireSuccess } from "./safety.ts";
@@ -131,24 +130,17 @@ export function createSubscriptionPort(
 
           // From here the admission's span covers the outcome, so its failure is reported while the span is active.
           observed = true;
-          return observeExecution(
-            host.tracing,
-            host.logs,
+          return observeInput(
+            host,
             { ...operation, propagation: options.propagation, attributes: options.traceAttributes },
-            async () => {
-              const admitted = await admission(guards, input);
-              if (admitted.isError) {
-                reportFailure(host.reporter, operation, admitted.error, options.traceAttributes);
-              }
-              return admitted;
-            },
+            () => admission(guards, input),
           );
         },
         (error) => executionError(error, options.signal),
       );
-      // A request refused before its admission ran has no span of its own.
+      // A request refused before its admission ran has no record or span of its own.
       if (!observed && result.isError) {
-        reportFailure(host.reporter, operation, result.error);
+        refuseInput(host, operation, result.error);
       }
       // A transport receives the admitted stream, or the admission's classified failure thrown.
       return requireSuccess(result);

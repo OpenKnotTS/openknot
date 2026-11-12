@@ -3,6 +3,8 @@ import { snapshotRequirements } from "./definitions.ts";
 import type { FlowExecutionError } from "./errors.ts";
 import type { ExecutionActor, ExecutionOptions } from "./execution.ts";
 import { integration } from "./internal/integration.ts";
+import type { TagOptions } from "./internal/tag.ts";
+import { snapshotTag } from "./internal/tag.ts";
 import type { UnitOfWorkContext, UnitOfWorkDefinition } from "./unit-of-work.ts";
 import { defaultUnitOfWork, isUnitOfWork } from "./unit-of-work.ts";
 import type { ErrorOf, Outcome, SuccessOf } from "@openknot-ts/behavior";
@@ -20,7 +22,7 @@ export type HandlerContext<R extends Requirements> = ResolvedRequirements<R> & {
   readonly uow: UnitOfWorkContext;
 };
 
-export interface HandlerDefinition {
+export interface HandlerDefinition extends TagOptions {
   readonly [HandlerMarker]: true;
   readonly kind: "command" | "query";
   readonly requirements: Requirements;
@@ -53,10 +55,11 @@ export type HandlerErrors<H extends HandlerDefinition> = ErrorOf<Awaited<ReturnT
 export type HandlerResult<H extends HandlerDefinition> =
   H extends Handler<infer I, infer _R, infer O, infer _K> ? ReturnType<ResolvedHandler<I, O>> : never;
 
-type HandlerOptions<I, R extends Requirements, O extends InputResult> = RequirementsOptions<R> & {
-  readonly run: (input: I, ctx: HandlerContext<R>) => O;
-  readonly unitOfWork?: UnitOfWorkDefinition;
-};
+type HandlerOptions<I, R extends Requirements, O extends InputResult> = RequirementsOptions<R> &
+  TagOptions & {
+    readonly run: (input: I, ctx: HandlerContext<R>) => O;
+    readonly unitOfWork?: UnitOfWorkDefinition;
+  };
 
 export interface HandlerFactory<I, Output, K extends "command" | "query"> {
   <const R extends Requirements = NoRequirements, O extends InputResult<Output> = InputResult<Output>>(
@@ -92,6 +95,7 @@ function factory<K extends "command" | "query">(kind: K): HandlerConstructor<K> 
           "__environment",
         ]),
         unitOfWork: snapshotUnitOfWork(options.unitOfWork),
+        ...snapshotTag(options),
       }),
       references: (definition) => [...Object.values(definition.requirements), definition.unitOfWork],
     });

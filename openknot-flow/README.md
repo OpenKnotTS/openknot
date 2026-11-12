@@ -23,7 +23,7 @@ pnpm --filter @openknot-ts/flow exec node examples/role-data.ts
 | Outputs | `reader` (from Behavior), `writer`, `publisher` | Implemented by plugs. |
 | Policies | `guard`, `hook`, `unitOfWork` | Internal dependencies. |
 
-Every definition declares its types on the head, so it reads like a signature: `command<Input, Output>()({ ... })`, `query<Input, Output>()`, `guard<Input>()`, `hook<Input>()`, `listener<Input>()`, `expose<Input, Output>()`. Output is optional; requirements and errors are inferred. With nothing to declare, `query({ ... })` takes no input.
+Every definition declares its types on the head, so it reads like a signature: `command<Input, Output>()({ ... })`, `query<Input, Output>()`, `guard<Input>()`, `hook<Input>()`, `listener<Input>()`, `expose<Input, Output>()`. Output is optional; requirements and errors are inferred. With nothing to declare, `query({ ... })` takes no input. Commands, queries, exposures, listeners, schedulers, guards and hooks accept an optional `tag`, such as `command<string>()({ tag: "role.rename", ... })`, which names their executions in logs and spans.
 
 ## Handlers
 
@@ -265,11 +265,18 @@ const delivery = plug({
 - `subscribe` always receives a `signal` (`SubscriptionOptions`) that aborts when the caller cancels or the application starts stopping; the implementation ends its stream on it.
 - Flow adds no buffer, replay, registry or fan-out. [`@openknot-ts/knot-pubsub`](../openknot-plugs/knot/knot-pubsub/README.md) is a local implementation.
 
-## Actors and tracing
+## Actors, tracing and logging
 
 - **Actor.** Pass `actor` on an input request; handlers, guards and hooks read `ctx.actor`, and nested work keeps it. Type it once by augmenting `ExecutionTypes` with `readonly actor: AppActor`. Actors never propagate to publications or telemetry; put `createdBy` in events when needed.
 - **Actor resolution.** `actorResolver({ requirements?, resolve(token, ctx) })` from `/wire` provides `executionActorResolver`, which transports consume, as [tRPC](../openknot-plugs/trpc/trpc-context/README.md) and [Auth0](../openknot-plugs/auth0/auth0-actor/README.md) do.
-- **Tracing.** Flow consumes `optional(trace)` from [`@openknot-ts/tracing`](../openknot-capabilities/tracing/README.md). Every input, handler, guard, hook, Unit of Work, publication and subscription admission becomes a span named `openknot.<kind>`; listener deliveries and scheduler ticks are roots. Requests carry a `propagation` carrier (`PropagationCarrier`) and `traceAttributes`; native bindings receive the implementation as `invoke.tracing` and `PublishOptions.tracing`. Add [`provideOpenTelemetry()`](../openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), or bind `trace` yourself. Native plugs trace their own operations with `withTrace()` from `@openknot-ts/tracing`.
+- **Tracing.** Flow consumes `optional(trace)` from [`@openknot-ts/tracing`](../openknot-capabilities/tracing/README.md). Every input, handler, guard, hook, Unit of Work, publication and subscription admission becomes a span named `openknot.<kind>`, with the definition's `tag` as `openknot.execution.tag`; listener deliveries and scheduler ticks are roots. Requests carry a `propagation` carrier (`PropagationCarrier`) and `traceAttributes`; native bindings receive the implementation as `invoke.tracing` and `PublishOptions.tracing`. Add [`provideOpenTelemetry()`](../openknot-plugs/opentelemetry/opentelemetry-tracing/README.md), or bind `trace` yourself. Native plugs trace their own operations with `withTrace()` from `@openknot-ts/tracing`.
+- **Logging.** Flow definitions declare `logger` from [`@openknot-ts/logging/wire`](../openknot-capabilities/logging/README.md) in their requirements and log through `ctx.logger`. It writes on the console, filtered by `LOG_LEVEL`, until a plug such as [`providePinoLogging()`](../openknot-plugs/pino/pino-logging/README.md) provides `logging`.
+- **Execution logs.** Flow logs its own executions of a kind once its variable is set: `LOG_LEVEL_EXPOSE`, `LOG_LEVEL_LISTENER`, `LOG_LEVEL_SCHEDULER`, `LOG_LEVEL_COMMAND`, `LOG_LEVEL_QUERY`, `LOG_LEVEL_GUARD`, `LOG_LEVEL_HOOK`, `LOG_LEVEL_UNIT_OF_WORK`, `LOG_LEVEL_PUBLISH` or `LOG_LEVEL_SUBSCRIBE`. `trace` and `debug` write `started` and the end, `info` the end (`succeeded` or `failed`), `warn` only failures, `error` only defects; `fatal` writes nothing. A returned failure is written at `warn` with its `errorType`; an internal error at `error` with the error. A kind's level replaces `LOG_LEVEL` for these records, so `LOG_LEVEL_COMMAND=debug` works with `LOG_LEVEL=info`. `LOG_DURATION=true` adds `durationMs`, measured with `performance.now()`. Records carry `kind` and `tag`, never inputs, outputs or actors; an unset kind runs without a wrapper.
+
+  ```text
+  LOG_LEVEL_COMMAND=info LOG_DURATION=true
+  2026-11-11T19:40:00.000Z INFO command role.rename succeeded { kind: 'command', tag: 'role.rename', durationMs: 1.42 }
+  ```
 
 ## Provision
 

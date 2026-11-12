@@ -2,14 +2,14 @@ import { InputCancelledError } from "../errors.ts";
 import type { ExecutionIdentity, ExecutionOptions } from "../execution.ts";
 import type { ExecutionLifetime } from "./cancellation.ts";
 import { executionLifetime } from "./cancellation.ts";
+import { observeExecution } from "./execution-logs.ts";
 import { executionError } from "./safety.ts";
 import type { ExecutionTrace } from "./tracing.ts";
-import { traceExecution } from "./tracing.ts";
 import type { UnitOfWorkExecutor } from "./uow-runtime.ts";
 import type { Outcome } from "@openknot-ts/behavior";
 import { failure } from "@openknot-ts/behavior";
 import { protectAsync, requireOutcome } from "@openknot-ts/behavior/internal/safety";
-import type { PropagationCarrier, TraceAttributes, Tracing } from "@openknot-ts/tracing";
+import type { PropagationCarrier, TraceAttributes } from "@openknot-ts/tracing";
 
 export function executionIdentity(actor: ExecutionOptions["actor"] = undefined): ExecutionIdentity {
   return Object.freeze({ actor });
@@ -30,7 +30,8 @@ export interface ExecutionFrame {
  * Work that runs outside such a scope, as a handler resolved through a plain Wire scope does, gets a frame of its
  * own for each root execution.
  */
-export function createExecutionEnvironment(uow: UnitOfWorkExecutor, tracing?: Tracing) {
+export function createExecutionEnvironment(uow: UnitOfWorkExecutor) {
+  const { tracing, logs } = uow;
   return {
     uow,
     tracing,
@@ -62,7 +63,7 @@ export function createExecutionEnvironment(uow: UnitOfWorkExecutor, tracing?: Tr
       return uow.frame?.propagation;
     },
     trace<T>(operation: Pick<ExecutionTrace, "kind" | "reference">, work: () => Promise<T>): Promise<T> {
-      return traceExecution(tracing, operation, work);
+      return observeExecution(tracing, logs, operation, work);
     },
     async run<A>(
       options: ExecutionOptions,
@@ -117,8 +118,9 @@ export function createExecutionEnvironment(uow: UnitOfWorkExecutor, tracing?: Tr
               operation.kind === "listener" ||
               operation.kind === "scheduler" ||
               operation.kind === "subscribe";
-            return traceExecution(
+            return observeExecution(
               tracing,
+              logs,
               {
                 ...operation,
                 propagation: input ? propagation : options.propagation,

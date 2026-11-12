@@ -3,6 +3,8 @@ import { snapshotRequirements } from "./definitions.ts";
 import type { FlowExecutionError } from "./errors.ts";
 import type { ExecutionActor } from "./execution.ts";
 import { integration } from "./internal/integration.ts";
+import type { TagOptions } from "./internal/tag.ts";
+import { snapshotTag } from "./internal/tag.ts";
 import type { ErrorOf, Outcome } from "@openknot-ts/behavior";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
 import { executable } from "@openknot-ts/behavior/internal/executable";
@@ -21,7 +23,7 @@ export interface HookExecutionContext {
 
 export type HookContext<R extends Requirements> = ResolvedRequirements<R> & HookExecutionContext;
 
-export interface HookDefinition<I = never> {
+export interface HookDefinition<I = never> extends TagOptions {
   readonly [HookMarker]: true;
   readonly kind: "hook";
   readonly requirements: Requirements;
@@ -42,9 +44,10 @@ export type HookErrors<H> = H extends Hook<infer _I, infer _R, infer O> ? ErrorO
 
 export interface HookFactory<I> {
   <const R extends Requirements = NoRequirements, O extends HookResult = HookResult>(
-    options: RequirementsOptions<R> & {
-      readonly run: (input: I, ctx: HookContext<R>) => O;
-    },
+    options: RequirementsOptions<R> &
+      TagOptions & {
+        readonly run: (input: I, ctx: HookContext<R>) => O;
+      },
   ): Hook<I, R, O>;
 }
 
@@ -54,9 +57,10 @@ export interface HookConstructor extends HookFactory<void> {
 }
 
 function createHook<I, const R extends Requirements, O extends HookResult>(
-  options: RequirementsOptions<R> & {
-    readonly run: (input: I, ctx: HookContext<R>) => O;
-  },
+  options: RequirementsOptions<R> &
+    TagOptions & {
+      readonly run: (input: I, ctx: HookContext<R>) => O;
+    },
 ): Hook<I, R, O> {
   return executable({
     marker: HookMarker as typeof HookMarker,
@@ -65,7 +69,10 @@ function createHook<I, const R extends Requirements, O extends HookResult>(
     run: options.run,
     invalidRunMessage: "hook() requires run()",
     integration,
-    define: () => ({ requirements: snapshotRequirements(options.requirements, ["actor", "__environment"]) }),
+    define: () => ({
+      requirements: snapshotRequirements(options.requirements, ["actor", "__environment"]),
+      ...snapshotTag(options),
+    }),
   });
 }
 

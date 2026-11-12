@@ -3,9 +3,9 @@ import type { TraceOptions } from "../execution.ts";
 import type { PublisherDefinition } from "../publisher.ts";
 import type { SubscriptionDefinition } from "../subscription.ts";
 import type { CommitContext } from "../unit-of-work.ts";
+import { observeExecution } from "./execution-logs.ts";
 import type { ExecutionEnvironment } from "./execution-runtime.ts";
 import { plugFailure } from "./safety.ts";
-import { traceExecution } from "./tracing.ts";
 import { isTransactional } from "./transactional.ts";
 import type { UnitOfWorkExecutor } from "./uow-runtime.ts";
 import type { PropagationCarrier } from "@openknot-ts/tracing";
@@ -83,8 +83,9 @@ export function publication<T extends { readonly publish: (...args: never[]) => 
         forwarded[messageIndex] = message;
       }
 
-      await traceExecution(
+      await observeExecution(
         uow.tracing,
+        uow.logs,
         { kind: "publish", reference, propagation: supplied.propagation, attributes: supplied.traceAttributes },
         async () => {
           const propagation = capturePropagation(uow.tracing) ?? options.propagation;

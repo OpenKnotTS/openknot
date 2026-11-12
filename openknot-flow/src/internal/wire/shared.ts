@@ -1,11 +1,12 @@
 import type { ExecutionOptions } from "../../execution.ts";
+import { observeExecution } from "../execution-logs.ts";
 import { createExecutionEnvironment, executionIdentity } from "../execution-runtime.ts";
 import type { InputHost, RuntimeScope } from "../runtime.ts";
 import type { ExecutionTrace } from "../tracing.ts";
-import { traceExecution } from "../tracing.ts";
+import type { UnitOfWorkExecutor } from "../uow-runtime.ts";
 import { createUnitOfWorkExecutor } from "../uow-runtime.ts";
 import { unitOfWorkChanges } from "./changes.ts";
-import type { Tracing } from "@openknot-ts/tracing";
+import { executionLogs } from "./logging.ts";
 import { trace } from "@openknot-ts/tracing/wire";
 import type { AdaptedDefinition, Definition, DefinitionAdapterContext, Lifetime } from "@openknot-ts/wire";
 import { optional, unit } from "@openknot-ts/wire";
@@ -19,16 +20,17 @@ export const lifetime: Lifetime = "scoped";
 /** Native units shared by every Flow definition of one application. */
 export function createAdapterRuntime() {
   const carrier = unit({
-    requirements: { trace: optional(trace) },
+    requirements: { trace: optional(trace), logs: executionLogs },
     provides: unitOfWorkChanges,
-    factory: ({ trace }) => createUnitOfWorkExecutor(trace),
+    factory: ({ trace, logs }) => createUnitOfWorkExecutor(trace, logs),
   });
   // One per application: each scope's request is a frame it reads through async context.
   const environment = unit({
-    requirements: { trace: optional(trace), carrier },
-    factory: ({ trace, carrier }) => createExecutionEnvironment(carrier, trace),
+    requirements: { carrier },
+    factory: ({ carrier }) => createExecutionEnvironment(carrier),
   });
-  function host(context: DefinitionAdapterContext, tracing: Tracing | undefined): InputHost {
+  function host(context: DefinitionAdapterContext, uow: UnitOfWorkExecutor): InputHost {
+    const { tracing, logs } = uow;
     return {
       tracing,
       get status(): string {
@@ -73,8 +75,9 @@ export function createAdapterRuntime() {
           );
         return operation === undefined
           ? execute()
-          : traceExecution(
+          : observeExecution(
               tracing,
+              logs,
               {
                 ...operation,
                 propagation: snapshot.propagation,

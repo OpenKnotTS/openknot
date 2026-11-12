@@ -7,6 +7,8 @@ import { guardedReferences, snapshotGuardOptions } from "./guard.ts";
 import type { HandlerDefinition, HandlerErrors, HandlerInput, HandlerOutput, HandlerResult } from "./handlers.ts";
 import { command, inputExecution, isHandler, query } from "./handlers.ts";
 import { integration } from "./internal/integration.ts";
+import type { TagOptions } from "./internal/tag.ts";
+import { snapshotTag } from "./internal/tag.ts";
 import type { Outcome, SuccessOf } from "@openknot-ts/behavior";
 import type { Composition } from "@openknot-ts/behavior/internal/composable";
 import { composable } from "@openknot-ts/behavior/internal/composable";
@@ -42,9 +44,12 @@ export type ExposureInvoker<P> =
     ? ExecutionInvoker<ExposureRequest<I, G>, SuccessOf<Awaited<O>>>
     : never;
 
-type ExposureOptions<I, R extends Requirements, O extends InputResult> = RequirementsOptions<R> & {
-  readonly run: (input: I, ctx: ExposureContext<R>) => O;
-};
+type ExposureOptions<I, R extends Requirements, O extends InputResult> = RequirementsOptions<R> &
+  TagOptions & {
+    readonly run: (input: I, ctx: ExposureContext<R>) => O;
+  };
+
+type Forwarding<H extends HandlerDefinition> = TagOptions & { readonly handler: H };
 
 /** Forwarding exposures infer their input, output and errors from the handler. */
 type ForwardingExposure<H extends HandlerDefinition, G extends Guards> = Exposure<
@@ -89,16 +94,16 @@ export interface ExposureFactory<I, Output = unknown> {
 export interface ExposureConstructor extends ExposureFactory<void> {
   <I = void, Output = unknown>(): ExposureFactory<I, Output>;
   <const H extends HandlerDefinition, const V extends HandlerDefinition, const G extends Guards = Guards>(
-    options: { readonly handler: H; readonly view: ViewOf<H, V> } & GuardOptions<G> & { readonly guards: G },
+    options: Forwarding<H> & { readonly view: ViewOf<H, V> } & GuardOptions<G> & { readonly guards: G },
   ): ViewedExposure<H, V, G>;
   <const H extends HandlerDefinition, const V extends HandlerDefinition>(
-    options: { readonly handler: H; readonly view: ViewOf<H, V> } & GuardOptions<undefined>,
+    options: Forwarding<H> & { readonly view: ViewOf<H, V> } & GuardOptions<undefined>,
   ): ViewedExposure<H, V, NoGuards>;
   <const H extends HandlerDefinition, const G extends Guards = Guards>(
-    options: { readonly handler: H } & GuardOptions<G> & { readonly guards: G },
+    options: Forwarding<H> & GuardOptions<G> & { readonly guards: G },
   ): ForwardingExposure<H, G>;
   <const H extends HandlerDefinition>(
-    options: { readonly handler: H } & GuardOptions<undefined>,
+    options: Forwarding<H> & GuardOptions<undefined>,
   ): ForwardingExposure<H, NoGuards>;
 }
 
@@ -109,7 +114,7 @@ type Respond = (input: unknown) => Promise<Outcome<unknown, Error>>;
  * the view reads the uncommitted writes and its failure rolls them back.
  */
 function viewed(options: object): object {
-  const { view, ...forwarding } = options as { readonly view: unknown; readonly handler?: unknown };
+  const { view, ...forwarding } = options as { readonly view: unknown; readonly handler?: unknown } & TagOptions;
   const handler = forwarding.handler;
 
   if (!isHandler(handler)) {
@@ -129,7 +134,8 @@ function viewed(options: object): object {
     const changed = await ctx.handler(input);
     return changed.isError ? changed : ctx.view(changed.value);
   };
-  const definition = { requirements, unitOfWork: handler.unitOfWork, run };
+  // The pair runs as one handler, which logs and traces under the exposure's tag.
+  const definition = { requirements, unitOfWork: handler.unitOfWork, run, ...snapshotTag(forwarding) };
 
   return {
     ...forwarding,
@@ -137,7 +143,7 @@ function viewed(options: object): object {
   };
 }
 
-function createExpose(options: GuardOptions<Guards | undefined>): ExposureDefinition {
+function createExpose(options: GuardOptions<Guards | undefined> & TagOptions): ExposureDefinition {
   const port = inputExecution("view" in options ? viewed(options) : options, "expose");
   const definition = executable({
     marker: InputPortMarker,
@@ -151,6 +157,7 @@ function createExpose(options: GuardOptions<Guards | undefined>): ExposureDefini
       return {
         requirements: snapshotRequirements(port.requirements),
         ...snapshotGuardOptions(options),
+        ...snapshotTag(options),
         [InputMarker]: true as const,
       };
     },

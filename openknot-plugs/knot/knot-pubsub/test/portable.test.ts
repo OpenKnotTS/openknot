@@ -20,6 +20,7 @@ test("the built package emits portable consumer declarations and runs without tR
     ["behavior", "openknot-behavior"],
     ["flow", "openknot-flow"],
     ["tracing", "openknot-capabilities/tracing"],
+    ["logging", "openknot-capabilities/logging"],
     ["versioning", "openknot-capabilities/versioning"],
     ["knot-pubsub", "openknot-plugs/knot/knot-pubsub"],
   ] as const) {

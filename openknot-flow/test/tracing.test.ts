@@ -195,7 +195,7 @@ test("Flow describes its executions as neutral spans, and returned failures reac
     capture: () => undefined,
     bind: (work) => work,
   };
-  const rejecting = command({ run: async () => failure(Rejected()) });
+  const rejecting = command({ tag: "orders.reject", run: async () => failure(Rejected()) });
   const endpoint = expose({ handler: rejecting });
   const incoming = listener({ run: () => success() });
   const scheduled = scheduler({ schedule: { every: { seconds: 1 } }, run: () => success() });
@@ -223,6 +223,9 @@ test("Flow describes its executions as neutral spans, and returned failures reac
     const rejected = recorded.find(({ span }) => span.name === "openknot.command");
     assert.equal(Rejected.is(rejected?.failure), true);
     assert.equal(rejected?.span.attributes?.["openknot.execution.kind"], "command");
+    assert.equal(rejected?.span.attributes?.["openknot.execution.tag"], "orders.reject");
+    const untagged = recorded.find(({ span }) => span.name === "openknot.expose");
+    assert.equal(untagged?.span.attributes?.["openknot.execution.tag"], undefined);
     assert.ok(recorded.every(({ span }) => !("execution" in span) && !("actor" in span)));
   } finally {
     await app.stop();

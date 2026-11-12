@@ -47,12 +47,14 @@
     "@openknot-ts/behavior": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@openknot-ts/tracing": "workspace:*",
-    "@openknot-ts/versioning": "workspace:*"
+    "@openknot-ts/versioning": "workspace:*",
+    "@openknot-ts/logging": "workspace:*"
   },
   "peerDependencies": {
     "@openknot-ts/behavior": "workspace:^",
     "@openknot-ts/tracing": "workspace:^",
     "@openknot-ts/wire": "workspace:^",
-    "@openknot-ts/versioning": "workspace:^"
+    "@openknot-ts/versioning": "workspace:^",
+    "@openknot-ts/logging": "workspace:^"
   }
 }

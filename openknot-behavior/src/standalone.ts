@@ -13,12 +13,15 @@ import { isOperation } from "./operation.ts";
 import type { ReaderDefinition, ReaderFunction } from "./reader.ts";
 import { isReader } from "./reader.ts";
 import type {} from "./wire.ts";
+import type { Logger } from "@openknot-ts/logging";
+import { consoleLogging, createLogger, isLoggerReference } from "@openknot-ts/logging";
 import type { ValueOverride } from "@openknot-ts/wire";
-type RuntimeDependency = ReaderFunction | RuntimeOperation;
+type RuntimeDependency = ReaderFunction | RuntimeOperation | Logger;
 
 /**
  * Convenience for scripts, experiments and tests outside application wiring.
- * Uses only the supplied overrides; resource ownership and scopes stay with the caller.
+ * Uses only the supplied overrides, and the console logger unless one overrides `logger`; resource ownership and
+ * scopes stay with the caller.
  */
 export function standalone<Input, R extends Requirements, Result extends OperationExecutionResult, E extends Event>(
   definition: Operation<Input, R, Result, E>,
@@ -39,9 +42,17 @@ function createStandaloneOperation(
   overrides: readonly ValueOverride[],
 ): RuntimeOperation {
   const readers = new Map<ReaderDefinition, ReaderFunction>();
+  let log: Logger | undefined;
   for (const { target, value } of overrides) {
+    if (isLoggerReference(target)) {
+      if (log !== undefined) {
+        throw BehaviorBindingError("Multiple loggers supplied.");
+      }
+      log = value as Logger;
+      continue;
+    }
     if (!isReader(target) || typeof value !== "function") {
-      throw BehaviorBindingError("standalone() overrides readers with functions.");
+      throw BehaviorBindingError("standalone() overrides readers with functions and logger with a logger.");
     }
     if (readers.has(target)) {
       throw BehaviorBindingError("Multiple implementations supplied for the same reader.");
@@ -78,6 +89,8 @@ function createStandaloneOperation(
         dependencies[key] = implementation;
       } else if (isOperation(required)) {
         dependencies[key] = resolve(required, [...path, key]);
+      } else if (isLoggerReference(required)) {
+        dependencies[key] = log ??= createLogger(consoleLogging);
       } else {
         throw BehaviorBindingError(`Invalid requirement: ${key}`);
       }

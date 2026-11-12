@@ -4,6 +4,8 @@ import type { FlowExecutionError } from "./errors.ts";
 import type { ExecutionActor, ExecutionOptions } from "./execution.ts";
 import { integration } from "./internal/integration.ts";
 import { ownField } from "./internal/request.ts";
+import type { TagOptions } from "./internal/tag.ts";
+import { snapshotTag } from "./internal/tag.ts";
 import type { ErrorOf, Outcome } from "@openknot-ts/behavior";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
 import { executable } from "@openknot-ts/behavior/internal/executable";
@@ -21,7 +23,7 @@ export type GuardContext<R extends Requirements> = ResolvedRequirements<R> & {
   readonly actor: ExecutionActor | undefined;
 };
 
-export interface GuardDefinition {
+export interface GuardDefinition extends TagOptions {
   readonly [GuardMarker]: true;
   readonly kind: "guard";
   readonly requirements: Requirements;
@@ -78,9 +80,10 @@ export type ExecutableGuard<I, E extends Error> = (
 
 export interface GuardFactory<I> {
   <const R extends Requirements = NoRequirements, O extends GuardResult = GuardResult>(
-    options: RequirementsOptions<R> & {
-      readonly run: (input: I, ctx: GuardContext<R>) => O;
-    },
+    options: RequirementsOptions<R> &
+      TagOptions & {
+        readonly run: (input: I, ctx: GuardContext<R>) => O;
+      },
   ): Guard<I, R, O>;
 }
 
@@ -90,9 +93,10 @@ export interface GuardConstructor extends GuardFactory<void> {
 }
 
 function createGuard<I, const R extends Requirements, O extends GuardResult>(
-  options: RequirementsOptions<R> & {
-    readonly run: (input: I, ctx: GuardContext<R>) => O;
-  },
+  options: RequirementsOptions<R> &
+    TagOptions & {
+      readonly run: (input: I, ctx: GuardContext<R>) => O;
+    },
 ): Guard<I, R, O> {
   const definition = executable({
     marker: GuardMarker,
@@ -101,7 +105,10 @@ function createGuard<I, const R extends Requirements, O extends GuardResult>(
     run: options.run,
     invalidRunMessage: "guard() requires run().",
     integration,
-    define: () => ({ requirements: snapshotRequirements(options.requirements, ["actor", "__environment"]) }),
+    define: () => ({
+      requirements: snapshotRequirements(options.requirements, ["actor", "__environment"]),
+      ...snapshotTag(options),
+    }),
   });
   return definition;
 }

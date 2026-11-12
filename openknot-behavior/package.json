@@ -65,13 +65,15 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "@openknot-ts/wire": "workspace:*",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@openknot-ts/logging": "workspace:*"
   },
   "engines": {
     "node": ">=24.11.0"
   },
   "packageManager": "pnpm@10.20.0",
   "peerDependencies": {
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
   },
   "dependencies": {

@@ -8,6 +8,9 @@ import type { BehaviorResolved } from "./internal/resolved.ts";
 import type { ErrorOf, Outcome, SuccessOf } from "./outcome.ts";
 import type { ReaderDefinition } from "./reader.ts";
 import { isReader } from "./reader.ts";
+import type { Logger } from "@openknot-ts/logging";
+import { isLoggerReference } from "@openknot-ts/logging";
+import type { LoggerReference } from "@openknot-ts/logging/wire";
 import { DefinitionIntegrationMarker, hasMarker } from "@openknot-ts/wire/internal/marker";
 import type { NoRequirements, RequirementsOptions } from "@openknot-ts/wire/internal/requirements";
 import { snapshotRequirements } from "@openknot-ts/wire/internal/requirements";
@@ -82,10 +85,15 @@ export interface OperationDefinition {
   readonly [OperationRun]: (input: never, ctx: never) => OperationExecutionResult;
 }
 
-export type Requirement = ReaderDefinition | OperationDefinition;
+/** Readers and operations, plus the logger: the only effect an operation performs, since it never changes the outcome. */
+export type Requirement = ReaderDefinition | OperationDefinition | LoggerReference;
 export type Requirements = Readonly<Record<string, Requirement>>;
 
-export type ResolvedRequirement<D> = D extends Requirement ? BehaviorResolved<D> : never;
+export type ResolvedRequirement<D> = D extends LoggerReference
+  ? Logger
+  : D extends Requirement
+    ? BehaviorResolved<D>
+    : never;
 
 export type ResolvedRequirements<R extends Requirements> = {
   readonly [K in keyof R]: ResolvedRequirement<R[K]>;
@@ -173,7 +181,7 @@ function createOperation<Input, const R extends Requirements, Result extends Ope
     integration,
     define: () => ({
       requirements: snapshotRequirements(options.requirements, {
-        accepts: (dependency) => isReader(dependency) || isOperation(dependency),
+        accepts: (dependency) => isReader(dependency) || isOperation(dependency) || isLoggerReference(dependency),
         invalidMessage: (name) => `Invalid operation requirement: ${name}`,
       }),
       ...(options.tag === undefined ? {} : { tag: options.tag }),

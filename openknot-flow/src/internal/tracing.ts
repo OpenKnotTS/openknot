@@ -1,3 +1,4 @@
+import { tagOf } from "./tag.ts";
 import type { PropagationCarrier, TraceAttributes, TraceSpan, Tracing } from "@openknot-ts/tracing";
 import { withTrace } from "@openknot-ts/tracing";
 
@@ -28,7 +29,7 @@ const roles: Readonly<Partial<Record<ExecutionTraceKind, Pick<TraceSpan, "kind" 
 });
 
 /** A returned failed Outcome marks the span, as a thrown error does. */
-function outcomeError(value: unknown): unknown {
+export function outcomeError(value: unknown): unknown {
   return typeof value === "object" && value !== null && "isError" in value && value.isError === true && "error" in value
     ? value.error
     : undefined;
@@ -44,6 +45,8 @@ export function traceExecution<T>(
     return work();
   }
 
+  const tag = tagOf(operation.reference);
+
   return withTrace(
     tracing,
     {
@@ -51,7 +54,11 @@ export function traceExecution<T>(
       ...roles[operation.kind],
       reference: operation.reference,
       propagation: operation.propagation,
-      attributes: { "openknot.execution.kind": operation.kind, ...operation.attributes },
+      attributes: {
+        "openknot.execution.kind": operation.kind,
+        ...(tag === undefined ? {} : { "openknot.execution.tag": tag }),
+        ...operation.attributes,
+      },
       failure: outcomeError,
     },
     work,

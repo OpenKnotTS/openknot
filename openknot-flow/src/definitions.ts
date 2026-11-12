@@ -5,6 +5,8 @@ import type { HandlerDefinition, HandlerInput, HandlerResult } from "./handlers.
 import { inputExecution } from "./handlers.ts";
 import { integration } from "./internal/integration.ts";
 import type { FlowResolved } from "./internal/resolved.ts";
+import type { TagOptions } from "./internal/tag.ts";
+import { snapshotTag } from "./internal/tag.ts";
 import type { Outcome, SuccessOf } from "@openknot-ts/behavior";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
 import { executable } from "@openknot-ts/behavior/internal/executable";
@@ -67,7 +69,7 @@ export type ExecutionContext<R extends Requirements, T> = ResolvedRequirements<R
 
 export type InputResult<Output = unknown> = Outcome<Output, Error> | PromiseLike<Outcome<Output, Error>>;
 
-export interface InputPortDefinition {
+export interface InputPortDefinition extends TagOptions {
   readonly [InputPortMarker]: true;
   readonly [InputMarker]: true;
   readonly kind: "scheduler" | "listener" | "expose";
@@ -186,7 +188,7 @@ function snapshotSchedule(schedule: Schedule): Schedule {
   return Object.freeze({ cron: schedule.cron, timeZone: schedule.timeZone });
 }
 
-interface ScheduleOptions {
+interface ScheduleOptions extends TagOptions {
   readonly schedule: Schedule;
   readonly overlap?: Overlap;
 }
@@ -223,7 +225,13 @@ export function scheduler(options: ScheduleOptions): InputPortDefinition {
         throw new TypeError("Unknown overlap policy");
       }
       const requirements = snapshotRequirements(port.requirements);
-      return { requirements, schedule: snapshotSchedule(options.schedule), overlap, [InputMarker]: true as const };
+      return {
+        requirements,
+        schedule: snapshotSchedule(options.schedule),
+        overlap,
+        ...snapshotTag(options),
+        [InputMarker]: true as const,
+      };
     },
   });
 
@@ -232,9 +240,10 @@ export function scheduler(options: ScheduleOptions): InputPortDefinition {
 
 export interface ListenerFactory<I> {
   <const R extends Requirements = NoRequirements, O extends InputResult = InputResult>(
-    options: RequirementsOptions<R> & {
-      readonly run: (input: I, ctx: ExecutionContext<R, ListenerTrigger>) => O;
-    },
+    options: RequirementsOptions<R> &
+      TagOptions & {
+        readonly run: (input: I, ctx: ExecutionContext<R, ListenerTrigger>) => O;
+      },
   ): Listener<I, R, O>;
 }
 
@@ -242,12 +251,14 @@ export interface ListenerFactory<I> {
 export interface ListenerConstructor extends ListenerFactory<void> {
   <I = void>(): ListenerFactory<I>;
   /** Forward each message to one handler. */
-  <const H extends HandlerDefinition>(options: {
-    readonly handler: H;
-  }): Listener<HandlerInput<H>, { readonly handler: H }, HandlerResult<H>>;
+  <const H extends HandlerDefinition>(
+    options: TagOptions & {
+      readonly handler: H;
+    },
+  ): Listener<HandlerInput<H>, { readonly handler: H }, HandlerResult<H>>;
 }
 
-function createListener(options: object): InputPortDefinition {
+function createListener(options: TagOptions): InputPortDefinition {
   if ("guards" in options) {
     throw new TypeError("Internal listeners do not accept guards");
   }
@@ -261,7 +272,11 @@ function createListener(options: object): InputPortDefinition {
     run: port.run as InputPortDefinition[typeof InputRun],
     invalidRunMessage: "A listener requires run() or handler",
     integration,
-    define: () => ({ requirements: snapshotRequirements(port.requirements), [InputMarker]: true as const }),
+    define: () => ({
+      requirements: snapshotRequirements(port.requirements),
+      ...snapshotTag(options),
+      [InputMarker]: true as const,
+    }),
   });
 
   return definition;

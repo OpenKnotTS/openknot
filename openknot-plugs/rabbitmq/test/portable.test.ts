@@ -20,6 +20,7 @@ test("the built topology infers routes and queues and emits portable bindings wi
     ["behavior", "openknot-behavior"],
     ["flow", "openknot-flow"],
     ["tracing", "openknot-capabilities/tracing"],
+    ["logging", "openknot-capabilities/logging"],
     ["versioning", "openknot-capabilities/versioning"],
     ["health", "openknot-capabilities/health"],
     ["rabbitmq", "openknot-plugs/rabbitmq"],

@@ -13,11 +13,12 @@ import type {
 } from "../unit-of-work.ts";
 import type { ExecutionLifetime } from "./cancellation.ts";
 import { executionLifetime } from "./cancellation.ts";
+import type { ExecutionLogs } from "./execution-logs.ts";
+import { observeExecution } from "./execution-logs.ts";
 import type { ExecutionFrame } from "./execution-runtime.ts";
 import { createJournal } from "./journal.ts";
 import type { Journal } from "./journal.ts";
 import { executionError, plugFailure, requireVoidOutcome } from "./safety.ts";
-import { traceExecution } from "./tracing.ts";
 import type { CommitListener, CommittedChange } from "./wire/changes.ts";
 import type { Outcome } from "@openknot-ts/behavior";
 import { failure, InternalBehaviorError } from "@openknot-ts/behavior";
@@ -87,7 +88,7 @@ function ownFailure(error: Error, signal: AbortSignal): boolean {
 }
 
 /** Application-local async carrier. Every native input starts an isolated execution. */
-export function createUnitOfWorkExecutor(tracing?: Tracing) {
+export function createUnitOfWorkExecutor(tracing?: Tracing, logs?: ExecutionLogs) {
   const contexts = new AsyncLocalStorage<ExecutionContext>();
   const currentWork = (): Work | undefined => contexts.getStore()?.work;
   const currentExecution = (): ExecutionState | undefined => contexts.getStore()?.execution;
@@ -516,6 +517,7 @@ export function createUnitOfWorkExecutor(tracing?: Tracing) {
 
   return {
     tracing,
+    logs,
     touched(result: unknown): boolean {
       return active()?.journal?.touched(result) ?? false;
     },
@@ -712,7 +714,7 @@ export function createUnitOfWorkExecutor(tracing?: Tracing) {
         vetoed: undefined,
       };
 
-      return traceExecution(tracing, { kind: "unit-of-work", reference: driver.reference }, async () =>
+      return observeExecution(tracing, logs, { kind: "unit-of-work", reference: driver.reference }, async () =>
         contexts.run({ ...contexts.getStore(), work }, () => root(work, run)),
       );
     },

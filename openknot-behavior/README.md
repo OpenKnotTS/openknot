@@ -108,7 +108,7 @@ One decision that changes several states of the same model returns a list, each 
 - `Event` is a types-only `{ readonly type: string }`. Name each model's union `<ModelName>Event`, such as `RoleEvent`, with a variant per `type`, for example `interface RoleRenamed extends Event<"RoleRenamed"> { readonly role: RoleState }`.
 - Child operations in `ctx` return their own results; their events are never merged automatically.
 
-The operation decides no-ops: the framework never compares states. Flow persists and publishes; an operation performs no infrastructure effects.
+The operation decides no-ops: the framework never compares states. Flow persists and publishes; an operation performs no infrastructure effects besides logging through `logger` from [`@openknot-ts/logging/wire`](../openknot-capabilities/logging/README.md), which never changes its outcome.
 
 ### Derived types
 
@@ -151,7 +151,7 @@ Caching stays outside Behavior: [`@openknot-ts/cache`](../openknot-capabilities/
 
 ## Running without an application
 
-`standalone(operation, overrides?)` runs an operation with explicitly supplied readers, for scripts and tests. Missing or duplicate readers and cycles fail before execution.
+`standalone(operation, overrides?)` runs an operation with explicitly supplied readers, for scripts and tests. Missing or duplicate readers and cycles fail before execution. A required `logger` writes on the console unless `override(logger, value)` supplies one.
 
 ```ts
 import { operation, reader, standalone, success, updated } from "@openknot-ts/behavior";
@@ -183,7 +183,7 @@ export const behavior = provideBehavior([roleOperations]);
 ```
 
 - Sources are operations, `operation.compose({ renameRole, deactivateRole })` groups, native Wire `unit()`s, namespaces and import loaders with literal specifiers, such as `() => import("./role.operations.ts")`. Models, readers, resources and plugs are rejected.
-- Readers and private child operations join through `requirements`; operations may require only readers and operations.
+- Readers and private child operations join through `requirements`; operations may require only readers, operations and `logger`.
 - Operations need no module of their own in an application: its `inputs` reach them through requirements. A provided module can still be listed in `defineApplication({ modules })`, where `includeOnly`, `exclude`, `when` and `requiredBy` select from it.
 - Operations and readers are scoped: resolve them inside `app.withScope(work, { root: operation })`, which acquires only what that operation can reach. Missing implementations fail at `runApplication()`.
 

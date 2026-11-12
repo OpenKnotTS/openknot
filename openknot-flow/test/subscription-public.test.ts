@@ -15,6 +15,7 @@ test("subscription and publisher declarations, native bindings and root imports 
       ["behavior", "openknot-behavior"],
       ["wire", "openknot-wire"],
       ["tracing", "openknot-capabilities/tracing"],
+      ["logging", "openknot-capabilities/logging"],
       ["versioning", "openknot-capabilities/versioning"],
     ] as const) {
       const destination = join(project, "node_modules", "@openknot-ts", name);

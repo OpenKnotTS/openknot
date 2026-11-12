@@ -3,6 +3,8 @@ import { httpHandler, httpMiddleware } from "./handler.ts";
 import type { ErrorReporter } from "@openknot-ts/error-reporting";
 import { reportError } from "@openknot-ts/error-reporting";
 import { errorReporter } from "@openknot-ts/error-reporting/wire";
+import type { Logger } from "@openknot-ts/logging";
+import { logger } from "@openknot-ts/logging/wire";
 import type {
   CancellationOptions,
   ManagedResource,
@@ -61,6 +63,7 @@ type ServerRequirements<H extends HandlerReference, R extends Requirements, Defa
   BunHttpServerReferences<H> & {
     readonly middleware: typeof httpMiddleware;
     readonly __reporter: OptionalDependency<typeof errorReporter>;
+    readonly __logger: typeof logger;
   } & (Default extends true ? { readonly __httpConfig: typeof httpConfig } : {});
 
 export type BunHttpServer<
@@ -80,6 +83,7 @@ async function listenBunHttpServer<Data, Route extends string>(
   options: BunHttpOptions<Data, Route>,
   middleware: readonly HttpMiddleware[],
   reporter: ErrorReporter | undefined,
+  log: Logger,
   { signal }: CancellationOptions,
 ): Promise<ResourceHandle<HttpServer<Data>>> {
   if (options.unix !== undefined && (settings?.PORT !== undefined || settings?.HTTP_HOST !== undefined)) {
@@ -119,6 +123,9 @@ async function listenBunHttpServer<Data, Route extends string>(
 
   const native = Bun.serve<Data, Route>({
     development: false,
+    // Answers a failure the host has already logged and reported, as Node's rejection capture does; a native error
+    // handler replaces it.
+    error: () => new Response("Internal Server Error", { status: 500 }),
     ...options,
     ...(settings !== undefined && options.unix === undefined
       ? {
@@ -136,8 +143,9 @@ async function listenBunHttpServer<Data, Route extends string>(
         return new Response("Service Unavailable", { status: 503 });
       }
 
-      // A failing handler is reported, then left to Bun's own error handling.
+      // A failing handler is logged and reported, then answered by the server's error handler.
       const reported = (error: unknown): never => {
+        log.error("HTTP request handler failed", { error });
         reportError(reporter, { error, source: "openknot.http", expected: false });
         throw error;
       };
@@ -226,6 +234,7 @@ export function bunHttpServer<
     handler,
     middleware: httpMiddleware,
     __reporter: optional(errorReporter),
+    __logger: logger,
   } as ServerRequirements<H, R, boolean>;
   return resource({
     requirements,
@@ -234,11 +243,20 @@ export function bunHttpServer<
         readonly handler: HttpHandler<HandlerData<H>>;
         readonly middleware: readonly HttpMiddleware[];
         readonly __reporter: ErrorReporter | undefined;
+        readonly __logger: Logger;
         readonly __httpConfig: Resolved<typeof httpConfig>;
       };
       const settings = typeof nativeOptions === "function" ? undefined : values.__httpConfig;
       const selected = typeof nativeOptions === "function" ? nativeOptions(values) : nativeOptions;
-      return listenBunHttpServer(values.handler, settings, selected, values.middleware, values.__reporter, acquisition);
+      return listenBunHttpServer(
+        values.handler,
+        settings,
+        selected,
+        values.middleware,
+        values.__reporter,
+        values.__logger,
+        acquisition,
+      );
     },
   });
 }

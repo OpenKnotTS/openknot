@@ -898,6 +898,9 @@ importers:
       '@openknot-ts/health':
         specifier: workspace:*
         version: link:../../../openknot-capabilities/health
+      '@openknot-ts/logging':
+        specifier: workspace:*
+        version: link:../../../openknot-capabilities/logging
       '@openknot-ts/wire':
         specifier: workspace:*
         version: link:../../../openknot-wire

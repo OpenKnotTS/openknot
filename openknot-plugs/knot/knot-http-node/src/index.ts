@@ -1,5 +1,7 @@
 import type { HttpMiddleware } from "./handler.ts";
 import { httpHandler, httpMiddleware } from "./handler.ts";
+import type { Logger } from "@openknot-ts/logging";
+import { logger } from "@openknot-ts/logging/wire";
 import type {
   CancellationOptions,
   ManagedResource,
@@ -68,6 +70,7 @@ type ServerRequirements<
 > = R & {
   readonly handler: H;
   readonly middleware: typeof httpMiddleware;
+  readonly __logger: typeof logger;
 } & (Default extends true ? { readonly __httpConfig: typeof httpConfig } : {});
 
 export type NodeHttpServer<
@@ -87,6 +90,7 @@ async function listenNodeHttpServer(
   options: ServerOptions,
   address: ListenOptions,
   middleware: readonly HttpMiddleware[],
+  log: Logger,
   { signal }: CancellationOptions,
 ): Promise<ResourceHandle<HttpServer>> {
   const dispatch = middleware.reduceRight<RequestListener>(
@@ -117,7 +121,7 @@ async function listenNodeHttpServer(
 
       // Answers as Node's own rejection capture does, which an application would otherwise have to enable process-wide.
       const failed = (error: unknown) => {
-        console.error(error);
+        log.error("HTTP request handler failed", { error });
         server[captureRejectionSymbol]?.(error as Error, "request", request, response);
       };
 
@@ -240,6 +244,7 @@ export function nodeHttpServer<
     ...declared,
     handler,
     middleware: httpMiddleware,
+    __logger: logger,
   } as ServerRequirements<H, R, boolean>;
   return resource({
     requirements,
@@ -248,12 +253,21 @@ export function nodeHttpServer<
         readonly handler: RequestListener;
         readonly middleware: readonly HttpMiddleware[];
         readonly __httpConfig: Resolved<typeof httpConfig>;
+        readonly __logger: Logger;
       };
       const settings = listen === undefined ? values.__httpConfig : undefined;
       const address =
         listen === undefined ? { port: values.__httpConfig.PORT, host: values.__httpConfig.HTTP_HOST } : listen(values);
       const selectedOptions = typeof nativeOptions === "function" ? nativeOptions(values) : nativeOptions;
-      return listenNodeHttpServer(values.handler, settings, selectedOptions, address, values.middleware, acquisition);
+      return listenNodeHttpServer(
+        values.handler,
+        settings,
+        selectedOptions,
+        address,
+        values.middleware,
+        values.__logger,
+        acquisition,
+      );
     },
   });
 }

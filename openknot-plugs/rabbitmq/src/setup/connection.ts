@@ -1,3 +1,4 @@
+import { logger } from "@openknot-ts/logging/wire";
 import { config, resource, unit } from "@openknot-ts/wire";
 import type { Requirements, RequirementsOptions, ResolvedReferences, CancellationOptions } from "@openknot-ts/wire";
 import { Connection } from "rabbitmq-client";
@@ -16,14 +17,15 @@ export const rabbitConfig = config({
 
 /**
  * Receives the failures the integration cannot return to a caller: connection errors, topology recovery and listener
- * deliveries. Writes to the console by default; bind it with `unit({ provides: rabbitErrors, factory })` to use the
- * application's logger.
+ * deliveries that never reached Flow. Writes through the application's `logger` by default; bind it with
+ * `unit({ provides: rabbitErrors, factory })` to report them elsewhere.
  */
 export const rabbitErrors = unit({
+  requirements: { logger },
   factory:
-    () =>
+    ({ logger }) =>
     (error: unknown): void => {
-      console.error("[openknot/rabbitmq]", error);
+      logger.error("RabbitMQ failure", { error });
     },
 });
 

@@ -231,10 +231,10 @@ test(
     assert.equal(await Promise.race([rejected.promise, handled.promise]), "dead-lettered");
     assert.deepEqual(bodies.sort(), ["-1", "not-json"]);
     assert.equal(
-      reports.filter(
-        ([, failure]) =>
-          typeof failure === "object" && failure !== null && "kind" in failure && failure.kind === "decode",
-      ).length,
+      reports.filter(([, attributes]) => {
+        const failure = (attributes as { readonly error?: { readonly kind?: unknown } } | undefined)?.error;
+        return failure?.kind === "decode";
+      }).length,
       2,
     );
   },

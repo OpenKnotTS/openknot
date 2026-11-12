@@ -73,7 +73,10 @@ export function bindRabbitListener(
             return result.value;
           },
           failurePolicy(failure) {
-            report(failure);
+            // Flow logs every failure of an execution it ran; only a message it never received is reported here.
+            if (failure.kind === "decode") {
+              report(failure);
+            }
             return failure.kind === "post-commit" ? "ack" : "reject";
           },
           onError: report,

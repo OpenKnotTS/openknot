@@ -88,8 +88,8 @@ test("a handler or middleware that fails answers 500 without its private headers
       assert.equal(await response.text(), "Internal Server Error");
     }
     assert.deepEqual(
-      reported.mock.calls.map((call) => call.arguments[0]),
-      [failure, failure, failure],
+      reported.mock.calls.map((call) => [String(call.arguments[0]).replace(/^\S+ /, ""), call.arguments[1]]),
+      Array.from({ length: 3 }, () => ["ERROR HTTP request handler failed", { error: failure }]),
     );
     assert.equal(await (await fetch(`${url}/healthy`)).text(), "ok");
   } finally {

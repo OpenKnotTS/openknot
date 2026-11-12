@@ -38,6 +38,7 @@
   "peerDependencies": {
     "@openknot-ts/flow": "workspace:^",
     "@openknot-ts/health": "workspace:^",
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/tracing": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
   },
@@ -50,6 +51,7 @@
     "@openknot-ts/behavior": "workspace:*",
     "@openknot-ts/flow": "workspace:*",
     "@openknot-ts/health": "workspace:*",
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/tracing": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@types/node": "catalog:",

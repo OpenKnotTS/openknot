@@ -37,12 +37,14 @@
     "example": "node examples/http.ts"
   },
   "peerDependencies": {
+    "@openknot-ts/logging": "workspace:^",
     "@openknot-ts/wire": "workspace:^"
   },
   "dependencies": {
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@openknot-ts/logging": "workspace:*",
     "@openknot-ts/wire": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:"

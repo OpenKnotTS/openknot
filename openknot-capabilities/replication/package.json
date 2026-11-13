@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/replication",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "OpenKnot replication: per-instance and shared read layers kept coherent with managed writes across instances.",
   "license": "MIT",

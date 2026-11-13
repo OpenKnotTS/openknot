@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/versioning",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "OpenKnot's optimistic concurrency contract: versioned save/remove semantics, VersionConflict and pluggable native implementations.",
   "license": "MIT",

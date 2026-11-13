@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/trpc-router",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Typed tRPC routers composed from OpenKnot Wire units.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/opentelemetry-tracing",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Optional OpenTelemetry API instrumentation for OpenKnot Flow.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/redis-client",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Redis client resources, connection watch and health check for OpenKnot applications, over node-redis.",
   "license": "MIT",

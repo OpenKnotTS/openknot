@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/auth0-authentication",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Native tRPC authentication middleware backed by OpenKnot's Auth0 resolver.",
   "license": "MIT",

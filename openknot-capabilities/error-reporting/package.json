@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/error-reporting",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "OpenKnot's error reporting contract: failures no caller receives, delivered to the application's reporter.",
   "license": "MIT",

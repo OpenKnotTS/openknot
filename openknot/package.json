@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/core",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "description": "The OpenKnot core in one package: Wire, Behavior and Flow.",
   "license": "MIT",
   "repository": {

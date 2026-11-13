@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/rabbitmq",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Managed RabbitMQ topology, publishers and listeners for OpenKnot.",
   "license": "MIT",

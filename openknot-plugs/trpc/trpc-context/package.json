@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/trpc-context",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "tRPC request context from OpenKnot actor resolution and trace propagation.",
   "license": "MIT",

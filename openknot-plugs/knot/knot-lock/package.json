@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-lock",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "In-process implementation of the OpenKnot lock contract for single instances and tests.",
   "license": "MIT",

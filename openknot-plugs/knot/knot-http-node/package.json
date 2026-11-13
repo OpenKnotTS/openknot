@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-http-node",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Node HTTP server lifecycle and draining for OpenKnot applications.",
   "license": "MIT",

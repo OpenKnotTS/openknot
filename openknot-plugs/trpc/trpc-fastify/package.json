@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/trpc-fastify",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "tRPC for OpenKnot applications on the Fastify host, through tRPC's official Fastify plugin.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/pino-logging",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Writes OpenKnot logging records through the application's pino instance.",
   "license": "MIT",

@@ -1,6 +1,6 @@
 {
   "name": "@openknot-ts/knot-health-bun",
-  "version": "0.0.3-preview",
+  "version": "0.0.4-preview",
   "type": "module",
   "description": "Health probe middleware for the OpenKnot Bun host.",
   "license": "MIT",

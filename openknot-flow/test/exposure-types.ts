@@ -79,6 +79,11 @@ const publicPort = expose<string>()({
   requirements: { session },
   run: (id, ctx) => success({ id, locale: ctx.session.locale }),
 });
+const readerPort = expose({ handler: hasPermission });
+const listedRoles = reader<() => Promise<readonly string[]>>();
+const listedRolesPort = expose({ handler: listedRoles, guards: { access: permissions } });
+// @ts-expect-error An exposed reader takes the exposure's one input.
+expose({ handler: reader<(id: string, locale: string) => string>() });
 const emptyGuardsPort = expose<number>()({ requirements: {}, guards: {}, run: (value) => success(value) });
 const reusedGuardPort = expose<number>()({
   requirements: {},
@@ -173,6 +178,15 @@ export async function verifyOptionalGuardTypes(app: Application): Promise<void> 
   void locale;
   await app.resolve(publicPort)({ input: "r1" });
   await app.resolve(emptyGuardsPort)({ input: 2 });
+  const permitted: boolean = await app.resolve(readerPort)({ input: "u1" });
+  const roles: readonly string[] = await app.resolve(listedRolesPort)({
+    input: undefined,
+    access: { actorId: "u1" },
+  });
+  void permitted;
+  void roles;
+  // @ts-expect-error An exposed reader keeps its parameter as the input type.
+  await app.resolve(readerPort)({ input: 1 });
   await app.resolve(reusedGuardPort)({ input: 2, access: { actorId: "u1" } });
   // @ts-expect-error Omitting guards does not erase business input types.
   await app.resolve(publicPort)({ input: 2 });

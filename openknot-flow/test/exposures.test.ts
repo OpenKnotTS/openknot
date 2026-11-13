@@ -433,6 +433,26 @@ test("an exposure acquires only the scoped resources its guards, handler and bin
   }
 });
 
+test("an exposure forwards to a reader as a query that responds with what it reads", async () => {
+  const findRole = reader<(id: string) => Promise<string>>();
+  const countRoles = reader<() => number>();
+  const data = plug({
+    port: reader.compose({ findRole, countRoles }),
+    bind: () => ({ findRole: (id) => Promise.resolve(`role:${id}`), countRoles: () => 2 }),
+  });
+  const roleApi = expose({ handler: findRole, guards: { access: allow } });
+  const countApi = expose({ handler: countRoles });
+  const app = await runApplication(
+    defineApplication({ modules: [provideFlow([roleApi, countApi]), providePlugs([data])] }),
+  );
+  try {
+    assert.equal(await app.resolve(roleApi)({ input: "r1", access: undefined }), "role:r1");
+    assert.equal(await app.resolve(countApi)({ input: undefined }), 2);
+  } finally {
+    await app.stop();
+  }
+});
+
 test(
   "pre-cancelled calls open no scope and cancellation between guards prevents business execution",
   {

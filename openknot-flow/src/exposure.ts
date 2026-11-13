@@ -4,12 +4,20 @@ import type { FlowExecutionError } from "./errors.ts";
 import type { ExecutionInvoker, ExecutionActor } from "./execution.ts";
 import type { GuardOptions, GuardRequest, Guards, NoGuards } from "./guard.ts";
 import { guardedReferences, snapshotGuardOptions } from "./guard.ts";
-import type { HandlerDefinition, HandlerErrors, HandlerInput, HandlerOutput, HandlerResult } from "./handlers.ts";
+import type {
+  Handler,
+  HandlerDefinition,
+  HandlerErrors,
+  HandlerInput,
+  HandlerOutput,
+  HandlerResult,
+} from "./handlers.ts";
 import { command, inputExecution, isHandler, query } from "./handlers.ts";
 import { integration } from "./internal/integration.ts";
 import type { TagOptions } from "./internal/tag.ts";
 import { snapshotTag } from "./internal/tag.ts";
-import type { Outcome, SuccessOf } from "@openknot-ts/behavior";
+import type { Outcome, Reader, ReaderFunction, SuccessOf } from "@openknot-ts/behavior";
+import { isReader, success } from "@openknot-ts/behavior";
 import type { Composition } from "@openknot-ts/behavior/internal/composable";
 import { composable } from "@openknot-ts/behavior/internal/composable";
 import { declarable } from "@openknot-ts/behavior/internal/declarable";
@@ -49,7 +57,21 @@ type ExposureOptions<I, R extends Requirements, O extends InputResult> = Require
     readonly run: (input: I, ctx: ExposureContext<R>) => O;
   };
 
-type Forwarding<H extends HandlerDefinition> = TagOptions & { readonly handler: H };
+/** A reader whose one optional parameter is the exposure's input. */
+type ExposedReader = Reader<(input: never) => unknown>;
+
+/** An exposed reader runs as a query of the default Unit of Work that responds with what it reads. */
+type AsHandler<H extends HandlerDefinition | ExposedReader> =
+  H extends Reader<infer F extends ReaderFunction>
+    ? Handler<
+        Parameters<F> extends [] ? void : Parameters<F>[0],
+        { readonly reader: H },
+        Promise<Outcome<Awaited<ReturnType<F>>, never>>,
+        "query"
+      >
+    : H;
+
+type Forwarding<H extends HandlerDefinition | ExposedReader> = TagOptions & { readonly handler: H };
 
 /** Forwarding exposures infer their input, output and errors from the handler. */
 type ForwardingExposure<H extends HandlerDefinition, G extends Guards> = Exposure<
@@ -89,22 +111,26 @@ export interface ExposureFactory<I, Output = unknown> {
 
 /**
  * A declared contract goes on the head, `expose<Input, Output>()({ ... })`. With nothing to declare,
- * `expose({ ... })` takes no input, and `expose({ handler })` infers the contract from the handler.
+ * `expose({ ... })` takes no input, and `expose({ handler })` infers the contract from the handler or reader.
  */
 export interface ExposureConstructor extends ExposureFactory<void> {
   <I = void, Output = unknown>(): ExposureFactory<I, Output>;
-  <const H extends HandlerDefinition, const V extends HandlerDefinition, const G extends Guards = Guards>(
-    options: Forwarding<H> & { readonly view: ViewOf<H, V> } & GuardOptions<G> & { readonly guards: G },
-  ): ViewedExposure<H, V, G>;
-  <const H extends HandlerDefinition, const V extends HandlerDefinition>(
-    options: Forwarding<H> & { readonly view: ViewOf<H, V> } & GuardOptions<undefined>,
-  ): ViewedExposure<H, V, NoGuards>;
-  <const H extends HandlerDefinition, const G extends Guards = Guards>(
+  <
+    const H extends HandlerDefinition | ExposedReader,
+    const V extends HandlerDefinition,
+    const G extends Guards = Guards,
+  >(
+    options: Forwarding<H> & { readonly view: ViewOf<AsHandler<H>, V> } & GuardOptions<G> & { readonly guards: G },
+  ): ViewedExposure<AsHandler<H>, V, G>;
+  <const H extends HandlerDefinition | ExposedReader, const V extends HandlerDefinition>(
+    options: Forwarding<H> & { readonly view: ViewOf<AsHandler<H>, V> } & GuardOptions<undefined>,
+  ): ViewedExposure<AsHandler<H>, V, NoGuards>;
+  <const H extends HandlerDefinition | ExposedReader, const G extends Guards = Guards>(
     options: Forwarding<H> & GuardOptions<G> & { readonly guards: G },
-  ): ForwardingExposure<H, G>;
-  <const H extends HandlerDefinition>(
+  ): ForwardingExposure<AsHandler<H>, G>;
+  <const H extends HandlerDefinition | ExposedReader>(
     options: Forwarding<H> & GuardOptions<undefined>,
-  ): ForwardingExposure<H, NoGuards>;
+  ): ForwardingExposure<AsHandler<H>, NoGuards>;
 }
 
 type Respond = (input: unknown) => Promise<Outcome<unknown, Error>>;
@@ -143,8 +169,26 @@ function viewed(options: object): object {
   };
 }
 
+/** A reader handler becomes the query an author would write around it, so it reads inside the Unit of Work. */
+function readerQuery(options: object): object {
+  const reader = "handler" in options ? options.handler : undefined;
+
+  if (!isReader(reader)) {
+    return options;
+  }
+
+  const run = async (input: unknown, ctx: { readonly reader: (input: unknown) => unknown }) =>
+    success(await ctx.reader(input));
+
+  return {
+    ...options,
+    handler: query<unknown>()({ requirements: { reader }, run, ...snapshotTag(options) }),
+  };
+}
+
 function createExpose(options: GuardOptions<Guards | undefined> & TagOptions): ExposureDefinition {
-  const port = inputExecution("view" in options ? viewed(options) : options, "expose");
+  const forwarding = readerQuery(options);
+  const port = inputExecution("view" in forwarding ? viewed(forwarding) : forwarding, "expose");
   const definition = executable({
     marker: InputPortMarker,
     kind: "expose",

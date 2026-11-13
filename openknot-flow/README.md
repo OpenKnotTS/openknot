@@ -78,6 +78,7 @@ const role = await app.resolve(getRole)({
 ```
 
 - A port that only forwards names its handler: `expose({ handler, guards?, view? })`, `listener({ handler })`, `scheduler({ handler, schedule })`. A port declares either `handler` or `requirements`/`run`.
+- `expose({ handler: reader })` also takes a reader with at most one parameter: it runs as a query of `defaultUnitOfWork` that responds with what the reader returns.
 - `view` is a query of the handler's Unit of Work whose input is the handler's output. It runs after the handler succeeds, in the same execution; its output is the response and its failure rolls back.
 - `guards` is a named object of `guard()` definitions. Each returns `success()` or `failure(error)`; they run in key order and stop at the first failure, before the handler's dependencies are resolved.
 - The request is `GuardRequest<I, G>` (`GuardInputs<G> & InputField<I>` with the execution options): `{ input, ...namedGuardInputs, signal?, actor?, propagation?, traceAttributes? }`. Guards are declared through `GuardOptions`, shared by exposures and subscriptions. A field whose input is `void` may be left out. Unknown fields are rejected, and the request must be a plain object; each own field is read once.

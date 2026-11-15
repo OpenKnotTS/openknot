@@ -36,10 +36,12 @@ List them through `providePlugs()`; Wire acquires the deliveries as resources. [
 
 | Export | Description |
 | --- | --- |
-| `inMemoryTopic<Key, Message>({ events, event, capacity? })` | A topic. `event(key)` encodes a key to a native event name (`NodeEventName`): equal names share a route. Exposes `keys()` and `subscriberCount(key)`. |
-| `inMemoryBroadcast<Message>({ events, event, capacity? })` | A broadcast. Exposes `subscriberCount()`. |
+| `inMemoryTopic<Key, Message>({ events, event, capacity? })` | A topic. `event(key)` encodes a key to a native event name (`NodeEventName`): equal names share a route. Exposes `keys()`, `subscriberCount(key)` and `interrupt(reason)`. |
+| `inMemoryBroadcast<Message>({ events, event, capacity? })` | A broadcast. Exposes `subscriberCount()` and `interrupt(reason)`. |
 | `SlowSubscriberError` | Ends a subscription whose queue is full. |
 | `InMemoryTopic`, `InMemoryTopicOptions`, `InMemoryBroadcast`, `InMemoryBroadcastOptions`, `InMemoryPubSubOptions` | Types. |
+
+`interrupt(reason)` ends every active subscription with `reason` and discards its queue; later subscriptions open as usual. A delivery that loses its source, such as [`@openknot-ts/redis-pubsub`](../../redis/redis-pubsub/README.md), uses it.
 
 `keys()` is a current view of active routes. To let Flow choose recipients, expose it through an ordinary reader plug:
 

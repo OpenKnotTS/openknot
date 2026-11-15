@@ -8,6 +8,7 @@ export interface InMemoryTopic<Key, Message> extends TopicImplementation<Key, Me
   subscribe(key: Key, options?: DeliveryOptions): AsyncIterableIterator<Message, void>;
   keys(): readonly Key[];
   subscriberCount(key: Key): number;
+  interrupt(reason: unknown): void;
 }
 export interface InMemoryTopicOptions<Key> extends InMemoryPubSubOptions {
   /** Native routing/equality, including namespaces and structured-key encoding, belong here. */

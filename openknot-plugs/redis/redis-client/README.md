@@ -19,8 +19,8 @@ const redis = redisClient({
 | Export | Description |
 | --- | --- |
 | `redisClient({ requirements?, create })` | The clients as a resource. Resolves to them plus `connection`. |
-| `redisHealthCheck({ redis, name?, timeoutMs? })` | `PING` must answer `PONG` within the check's deadline (one second by default). |
-| `redisConnectionOf(client)` | A `ConnectionWatch` for a client this resource does not manage. |
+| `redisHealthCheck({ redis, name?, timeoutMs? })` | The subscriber client must be ready and `PING` must answer `PONG` within the check's deadline (one second by default). |
+| `redisConnectionOf(client)` | A `ConnectionWatch` over a client this resource does not manage. |
 | `RedisConnections`, `RedisCommands`, `RedisSubscriber` | Types. |
 
 ## Lifecycle

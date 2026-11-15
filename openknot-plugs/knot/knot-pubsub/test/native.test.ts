@@ -187,6 +187,24 @@ test("overflow errors and detaches only the slow subscription while publishers a
   assert.deepEqual(managed.value.keys(), []);
 });
 
+test("interrupt ends every active subscription with its reason, and later subscriptions open as usual", async (t) => {
+  const events = new EventEmitter();
+  const managed = await inMemoryTopic<string, number>({ events, event: (key) => key });
+  t.after(() => managed.release());
+  const waiting = managed.value.subscribe("a");
+  const queued = managed.value.subscribe("b");
+  managed.value.publish("b", 1);
+  const pending = waiting.next();
+  const reason = new Error("connection lost");
+  managed.value.interrupt(reason);
+  await assert.rejects(pending, (error) => error === reason);
+  await assert.rejects(queued.next(), (error) => error === reason);
+  assert.deepEqual(managed.value.keys(), []);
+  const later = managed.value.subscribe("a");
+  managed.value.publish("a", 2);
+  assert.deepEqual(await later.next(), { done: false, value: 2 });
+});
+
 test("managed release closes pending and unread streams while preserving foreign native listeners", async () => {
   const events = new EventEmitter();
   const seen: number[] = [];

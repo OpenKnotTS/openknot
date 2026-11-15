@@ -114,6 +114,7 @@ async function run(url: string): Promise<void> {
         commands: own.commands,
         subscriber: listening.subscriber,
       }),
+      connection: ({ subscriber: listening }) => listening.connection.subscriber,
     }),
     redisLock({ requirements: { redis }, commands: ({ redis: own }) => own.commands }),
   ];

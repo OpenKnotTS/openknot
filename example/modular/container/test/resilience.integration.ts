@@ -84,7 +84,7 @@ test(
     try {
       // Redis: health turns down while commands and events go on; reconnecting clears the cache and health is up.
       const lost = Promise.withResolvers<void>();
-      const unwatch = app.resolve(redis).connection.watch({ lost: lost.resolve, restored: () => undefined });
+      const unwatch = app.resolve(redis).connection.commands.watch({ lost: lost.resolve, restored: () => undefined });
       await docker(["stop", containers.redis]);
       await until(lost.promise, t.signal);
       unwatch();

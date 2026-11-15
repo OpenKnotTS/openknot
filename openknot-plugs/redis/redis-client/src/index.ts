@@ -37,7 +37,7 @@ export type RedisManagedClient = Pick<RedisClientType, "close" | "destroy" | "is
   off(...args: Parameters<RedisClientType["off"]>): void;
 };
 
-export function redisConnectionOf(client: RedisCommands & RedisManagedClient): ConnectionWatch {
+export function redisConnectionOf(client: Pick<RedisManagedClient, "on" | "off">): ConnectionWatch {
   return connectionWatch(({ lost, restored }) => {
     client.on("reconnecting", lost);
     client.on("end", lost);
@@ -200,7 +200,11 @@ export function redisClient<const R extends Requirements = {}, C extends RedisCo
       } finally {
         acquisition.signal.removeEventListener("abort", abort);
       }
-      const connection = redisConnectionOf(clients.commands);
+      // Each client reconnects on its own, so each has its own watch: work follows the client it uses.
+      const connection = Object.freeze({
+        commands: redisConnectionOf(clients.commands),
+        subscriber: redisConnectionOf(clients.subscriber),
+      });
       return {
         value: Object.assign(clients, { connection }),
         async release() {

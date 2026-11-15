@@ -218,7 +218,7 @@ const roleCache = cache({
   entity: "role",
   requirements: { redis },
   port: findRole,
-  connection: ({ redis }) => redis.connection,
+  connection: ({ redis }) => redis.connection.commands,
   persist: ({ redis }) => {
     // Calls take effect in the order they were made.
     let queue = Promise.resolve();

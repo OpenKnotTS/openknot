@@ -177,6 +177,34 @@ test("a ready client reports the first error of each outage as an unattended fai
 
 test("connection reports lost once and restored on ready", async () => {
   const log: string[] = [];
+test("each client's connection watch follows only that client", async () => {
+  const native = clients([]);
+  const redis = redisClient({ create: () => native });
+  const app = await runApplication(defineApplication({ modules: [composeModule({ providers: { redis } })] }));
+  const { connection } = app.resolve(redis);
+  const events: string[] = [];
+  const unwatch = [
+    connection.commands.watch({
+      lost: () => events.push("commands:lost"),
+      restored: () => events.push("commands:restored"),
+    }),
+    connection.subscriber.watch({
+      lost: () => events.push("subscriber:lost"),
+      restored: () => events.push("subscriber:restored"),
+    }),
+  ];
+  try {
+    native.subscriber.emit("reconnecting");
+    native.subscriber.emit("ready");
+    assert.deepEqual(events, ["subscriber:lost", "subscriber:restored"]);
+  } finally {
+    for (const stop of unwatch) {
+      stop();
+    }
+    await app.stop();
+  }
+});
+
   const emitter = new EventEmitter();
   const commands = {
     async sendCommand(_arguments: string[]) {
@@ -215,7 +243,7 @@ test("connection reports lost once and restored on ready", async () => {
   };
   const native = { commands, subscriber };
   const redis = redisClient({ create: () => native });
-  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection });
+  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection.commands });
   const app = await runApplication(
     defineApplication({ modules: [composeModule({ providers: { redis, connectionUnit } })] }),
   );
@@ -299,7 +327,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
   };
   const native = { commands, subscriber };
   const redis = redisClient({ create: () => native });
-  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection });
+  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection.commands });
   const app = await runApplication(
     defineApplication({ modules: [composeModule({ providers: { redis, connectionUnit } })] }),
   );

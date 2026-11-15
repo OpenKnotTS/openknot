@@ -33,17 +33,23 @@ const redis = redisClient({
 
 ## Connection
 
-`connection` is a `ConnectionWatch` from `@openknot-ts/wire`, which `@openknot-ts/cache`, `@openknot-ts/replication` and the outbox accept:
+`connection` holds a `ConnectionWatch` from `@openknot-ts/wire` per client, `connection.commands` and `connection.subscriber`, which `@openknot-ts/cache`, `@openknot-ts/replication` and the outbox accept. Work listens to the client it uses:
 
 ```ts
 export const replicaStorage = redisReplicaStore({
   requirements: { redis },
   commands: ({ redis }) => redis.commands,
-  connection: ({ redis }) => redis.connection,
+  connection: ({ redis }) => redis.connection.commands,
+});
+
+export const replicaChannel = redisReplicationChannel({
+  requirements: { redis },
+  connections: ({ redis }) => redis,
+  connection: ({ redis }) => redis.connection.subscriber,
 });
 ```
 
-`connection.watch({ lost, restored })` returns an unsubscribe. It follows the commands client: `reconnecting` or `end` reports `lost` once, the next `ready` reports `restored`. The subscriber client is not covered.
+Each watch's `watch({ lost, restored })` returns an unsubscribe. It follows its own client: `reconnecting` or `end` reports `lost` once, the next `ready` reports `restored`.
 
 ## Tests
 

@@ -127,7 +127,8 @@ test(
         unit({
           provides: replicationChannel,
           requirements: { redis },
-          factory: ({ redis }) => redisReplicationChannelOf(redis, { channel: namespace }),
+          factory: ({ redis }) =>
+            redisReplicationChannelOf(redis, { channel: namespace, connection: redis.connection.subscriber }),
         }),
         unit({
           provides: lock,

@@ -1368,6 +1368,9 @@ importers:
         specifier: 'catalog:'
         version: 24.19.2
       typescript:
+      '@openknot-ts/redis-client':
+        specifier: workspace:*
+        version: link:../redis-client
         specifier: 'catalog:'
         version: 7.0.2
 

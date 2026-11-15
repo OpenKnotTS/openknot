@@ -58,7 +58,7 @@ There is no polling; the only timer follows another owner's lease by the databas
 - Several instances share the table through claims: one owner per name until its lease ends. The dispatcher renews the claim before each send and stops if another owner took over.
 - Records are ordered by insertion; concurrent transactions on one name become visible in commit order, so order holds for events the application serializes.
 - Deliveries run in the dispatcher's own context; each record carries its own trace propagation.
-- `connection` accepts any `ConnectionWatch` from `@openknot-ts/wire`, such as `rabbitConnection` or a Redis client's `connection`.
+- `connection` accepts any `ConnectionWatch` from `@openknot-ts/wire`, such as `rabbitConnection` or a Redis client's `connection.commands`.
 - Event schemas must evolve compatibly: records written before a deploy are delivered after it.
 
 ## Store contract

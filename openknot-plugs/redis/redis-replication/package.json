@@ -51,6 +51,7 @@
     "@types/node": "catalog:",
     "typescript": "catalog:",
     "@openknot-ts/flow": "workspace:*",
+    "@openknot-ts/redis-client": "workspace:*",
     "@openknot-ts/redis-lock": "workspace:*"
   },
   "peerDependencies": {

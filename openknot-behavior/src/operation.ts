@@ -1,3 +1,4 @@
+import type { Created, Deleted, Unchanged, Updated } from "./changes.ts";
 import type { Event } from "./event.ts";
 import type { Composition } from "./internal/composable.ts";
 import { composable } from "./internal/composable.ts";
@@ -23,21 +24,18 @@ export const OperationRun = Symbol.for("@openknot-ts/behavior/operation-run");
 /** Type-only event contract; no runtime registration or event catalogue. */
 declare const OperationEventType: unique symbol;
 
-export type OperationOutput<State> =
-  | {
-      readonly changeType: "created" | "updated";
-      readonly next: State;
-      readonly previous?: never;
-      readonly current?: never;
-    }
-  | { readonly changeType: "deleted"; readonly previous: State; readonly next?: never; readonly current?: never }
-  | { readonly changeType: "unchanged"; readonly current: State; readonly next?: never; readonly previous?: never };
+/** A change that forbids the other changes' fields, so a mixed shape is not an output. */
+type Exclusive<Change> = Change extends unknown
+  ? Change & { readonly [Field in Exclude<"next" | "previous" | "current", keyof Change>]?: never }
+  : never;
+
+export type OperationOutput<State> = Exclusive<Created<State> | Updated<State> | Deleted<State> | Unchanged<State>>;
 
 /** One change, or the changes of several states of the same model. */
 type OperationChanges<State> = OperationOutput<State> | readonly OperationOutput<State>[];
 
 /** True when nothing changed: an unchanged output, or a list of only unchanged outputs (empty included). */
-type Unchanged<Output> = [Output] extends [readonly (infer Change)[]]
+type IsUnchanged<Output> = [Output] extends [readonly (infer Change)[]]
   ? [Change] extends [{ readonly changeType: "unchanged" }]
     ? true
     : false
@@ -46,12 +44,12 @@ type Unchanged<Output> = [Output] extends [readonly (infer Change)[]]
     : false;
 
 type EmittedEvents<Output, E extends Event> = Output extends unknown
-  ? Unchanged<Output> extends true
+  ? IsUnchanged<Output> extends true
     ? never
     : E
   : never;
 type ChangedDraft<Output, E extends Event> = Output extends unknown
-  ? Unchanged<Output> extends true
+  ? IsUnchanged<Output> extends true
     ? never
     : { readonly output: Output; readonly events: readonly E[] }
   : never;

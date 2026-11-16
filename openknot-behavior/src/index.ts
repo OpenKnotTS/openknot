@@ -1,7 +1,7 @@
 export type { Outcome, Success, Failure, SuccessOf, ErrorOf } from "./outcome.ts";
 export { success, failure, isOutcome } from "./outcome.ts";
 export { created, updated, deleted, unchanged } from "./changes.ts";
-export type { Deleted } from "./changes.ts";
+export type { Created, Updated, Deleted, Unchanged } from "./changes.ts";
 export type { Event } from "./event.ts";
 export { error, InternalBehaviorError, BehaviorBindingError, ModelValidationError } from "./errors.ts";
 export type { ErrorDescription, ErrorFactory, TypedError } from "./errors.ts";

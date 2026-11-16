@@ -108,7 +108,7 @@ export type {
   UowRolledBack,
 } from "./unit-of-work.ts";
 
-export type { Deleted } from "@openknot-ts/behavior";
+export type { Created, Updated, Deleted, Unchanged } from "@openknot-ts/behavior";
 export type {
   OutputBinding,
   OutputBindings,

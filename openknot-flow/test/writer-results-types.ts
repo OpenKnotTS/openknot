@@ -1,7 +1,7 @@
 import { command, persist, upserted, writer } from "../src/index.ts";
 import type { Deleted, Upserted } from "../src/index.ts";
 import { created, deleted, updated } from "@openknot-ts/behavior";
-import type { Deleted as BehaviorDeleted, OperationOutput, unchanged } from "@openknot-ts/behavior";
+import type { Created, Deleted as BehaviorDeleted, OperationOutput, Unchanged } from "@openknot-ts/behavior";
 import { plug } from "@openknot-ts/wire";
 import "../src/wire.ts";
 
@@ -91,8 +91,8 @@ writer<(roles: readonly Role[]) => Promise<readonly (Upserted<Role> | Deleted<{ 
 const upsertState = async (state: State) => upserted(state);
 const deleteState = async (state: State) => deleted(state);
 declare const anyChange: OperationOutput<State>;
-declare const kept: ReturnType<typeof created<State>> | ReturnType<typeof unchanged<State>>;
-declare const removal: ReturnType<typeof deleted<State>>;
+declare const kept: Created<State> | Unchanged<State>;
+declare const removal: BehaviorDeleted<State>;
 const maybeKept: Promise<State | undefined> = persist(anyChange, { upsert: upsertState, delete: deleteState });
 const keptState: Promise<State> = persist(kept, { upsert: upsertState });
 const removed: Promise<undefined> = persist(removal, { delete: deleteState });

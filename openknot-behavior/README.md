@@ -90,14 +90,14 @@ const renameRole = operation<{ readonly role: RoleState; readonly name: string }
 
 Every success carries a fixed `output`, built with a helper:
 
-| Helper | Descriptor |
-| --- | --- |
-| `created(state)` | `{ changeType: "created", next: state }` |
-| `updated(state)` | `{ changeType: "updated", next: state }` |
-| `deleted(state)` | `{ changeType: "deleted", previous: state }` |
-| `unchanged(state)` | `{ changeType: "unchanged", current: state }` |
+| Helper | Type | Descriptor |
+| --- | --- | --- |
+| `created(state)` | `Created<State>` | `{ changeType: "created", next: state }` |
+| `updated(state)` | `Updated<State>` | `{ changeType: "updated", next: state }` |
+| `deleted(state)` | `Deleted<State>` | `{ changeType: "deleted", previous: state }` |
+| `unchanged(state)` | `Unchanged<State>` | `{ changeType: "unchanged", current: state }` |
 
-The type is `OperationOutput<State>`; `Deleted<Payload>` names a deletion result and also types persistence writers. Helpers freeze their own wrapper and keep the state by reference.
+`OperationOutput<State>` is their union; name one when `run` declares its output, for example `Created<Role> | Unchanged<Role>`. `Deleted<Payload>` also types persistence writers. Helpers freeze their own wrapper and keep the state by reference.
 
 One decision that changes several states of the same model returns a list, each change with its own type, for example `output: [updated(kept), deleted(merged)]`. An empty list means nothing changed.
 

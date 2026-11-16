@@ -37,6 +37,8 @@ function clients(log: string[], fail = false) {
     emit: emitter.emit.bind(emitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    async sSubscribe(..._args: Parameters<RedisSubscriber["sSubscribe"]>) {},
+    async sUnsubscribe(..._args: Parameters<RedisSubscriber["sUnsubscribe"]>) {},
     isReady: true,
     async connect() {
       log.push("subscriber:connect");
@@ -175,6 +177,34 @@ test("a ready client reports the first error of each outage as an unattended fai
   ]);
 });
 
+test("each client's connection watch follows only that client", async () => {
+  const native = clients([]);
+  const redis = redisClient({ create: () => native });
+  const app = await runApplication(defineApplication({ modules: [composeModule({ providers: { redis } })] }));
+  const { connection } = app.resolve(redis);
+  const events: string[] = [];
+  const unwatch = [
+    connection.commands.watch({
+      lost: () => events.push("commands:lost"),
+      restored: () => events.push("commands:restored"),
+    }),
+    connection.subscriber.watch({
+      lost: () => events.push("subscriber:lost"),
+      restored: () => events.push("subscriber:restored"),
+    }),
+  ];
+  try {
+    native.subscriber.emit("reconnecting");
+    native.subscriber.emit("ready");
+    assert.deepEqual(events, ["subscriber:lost", "subscriber:restored"]);
+  } finally {
+    for (const stop of unwatch) {
+      stop();
+    }
+    await app.stop();
+  }
+});
+
 test("connection reports lost once and restored on ready", async () => {
   const log: string[] = [];
   const emitter = new EventEmitter();
@@ -202,6 +232,8 @@ test("connection reports lost once and restored on ready", async () => {
     off: subscriberEmitter.off.bind(subscriberEmitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    async sSubscribe(..._args: Parameters<RedisSubscriber["sSubscribe"]>) {},
+    async sUnsubscribe(..._args: Parameters<RedisSubscriber["sUnsubscribe"]>) {},
     isReady: true,
     async connect() {
       log.push("subscriber:connect");
@@ -215,7 +247,7 @@ test("connection reports lost once and restored on ready", async () => {
   };
   const native = { commands, subscriber };
   const redis = redisClient({ create: () => native });
-  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection });
+  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection.commands });
   const app = await runApplication(
     defineApplication({ modules: [composeModule({ providers: { redis, connectionUnit } })] }),
   );
@@ -286,6 +318,8 @@ test("unsubscribing twice keeps the other watchers", async () => {
     off: subscriberEmitter.off.bind(subscriberEmitter),
     async subscribe(..._args: Parameters<RedisSubscriber["subscribe"]>) {},
     async unsubscribe(..._args: Parameters<RedisSubscriber["unsubscribe"]>) {},
+    async sSubscribe(..._args: Parameters<RedisSubscriber["sSubscribe"]>) {},
+    async sUnsubscribe(..._args: Parameters<RedisSubscriber["sUnsubscribe"]>) {},
     isReady: true,
     async connect() {
       log.push("subscriber:connect");
@@ -299,7 +333,7 @@ test("unsubscribing twice keeps the other watchers", async () => {
   };
   const native = { commands, subscriber };
   const redis = redisClient({ create: () => native });
-  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection });
+  const connectionUnit = unit({ requirements: { redis }, factory: ({ redis }) => redis.connection.commands });
   const app = await runApplication(
     defineApplication({ modules: [composeModule({ providers: { redis, connectionUnit } })] }),
   );
@@ -378,8 +412,9 @@ test("unsubscribing twice keeps the other watchers", async () => {
   await app.stop();
 });
 
-test("the health check is up only for PONG, and its deadline withdraws a PING still waiting", async () => {
+test("the health check is up only for PONG on a ready subscriber, and its deadline withdraws a PING still waiting", async () => {
   let reply: (signal: AbortSignal | undefined) => Promise<unknown> = async () => "PONG";
+  const subscriber = { isReady: true };
   const redis = resource({
     initialize: async () => ({
       value: {
@@ -387,6 +422,7 @@ test("the health check is up only for PONG, and its deadline withdraws a PING st
           sendCommand: (_arguments: string[], options?: { readonly abortSignal?: AbortSignal }) =>
             reply(options?.abortSignal),
         },
+        subscriber,
       },
       release() {},
     }),
@@ -409,6 +445,9 @@ test("the health check is up only for PONG, and its deadline withdraws a PING st
     const status = async () =>
       (await app.resolve(healthProbes).health({ signal: new AbortController().signal })).status;
     assert.equal(await status(), "up");
+    subscriber.isReady = false;
+    assert.equal(await status(), "down");
+    subscriber.isReady = true;
     reply = async () => "LOADING";
     assert.equal(await status(), "down");
     let withdrawn = false;

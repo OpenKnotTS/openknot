@@ -10,10 +10,14 @@ import { redisReplicaStore, redisReplicationChannel } from "@openknot-ts/redis-r
 export const replicaStorage = redisReplicaStore({
   requirements: { redis },
   commands: ({ redis }) => redis.commands,
-  connection: ({ redis }) => redis.connection,
+  connection: ({ redis }) => redis.connection.commands,
 });
 
-export const replicaChannel = redisReplicationChannel({ requirements: { redis }, connections: ({ redis }) => redis });
+export const replicaChannel = redisReplicationChannel({
+  requirements: { redis },
+  connections: ({ redis }) => redis,
+  connection: ({ redis }) => redis.connection.subscriber,
+});
 ```
 
 ## API
@@ -21,10 +25,11 @@ export const replicaChannel = redisReplicationChannel({ requirements: { redis },
 | Entry | Export | Description |
 | --- | --- | --- |
 | `/wire` | `redisReplicaStore({ requirements?, commands, connection?, options? })` | The store. `options(dependencies)` returns `ReplicaStoreOptions`: `{ prefix, tombstoneTtl, encode, decode }`. |
-| `/wire` | `redisReplicationChannel({ requirements?, connections, channel? })` | The channel; `channel` is a string or `(dependencies) => string`. |
+| `/wire` | `redisReplicationChannel({ requirements?, connections, connection, channel? })` | The channel; `connection` watches the subscriber client, `channel` is a string or `(dependencies) => string`. |
+| root | `redisReplicationChannelOf(connections, { connection, channel? })` | The channel over clients directly. |
 | root | `redisReplicaStoreOf(commands, options?)` | The store over a client directly. |
 
-Pass `connection` (such as `redis.connection` from [`@openknot-ts/redis-client`](../redis-client/README.md)) so the replication learns of an outage at once; without it, commits, shared reads and `stop()` can wait for a held command. See the [replication README](../../../openknot-capabilities/replication/README.md#store-connection).
+Pass `connection` (such as `redis.connection.commands` from [`@openknot-ts/redis-client`](../redis-client/README.md)) so the replication learns of an outage at once; without it, commits, shared reads and `stop()` can wait for a held command. See the [replication README](../../../openknot-capabilities/replication/README.md#store-connection).
 
 ## Store
 
@@ -40,7 +45,7 @@ Pass `connection` (such as `redis.connection` from [`@openknot-ts/redis-client`]
 ## Channel
 
 - JSON messages on `openknot:replication`, or `channel`. Bigint keys and orders keep their type.
-- Invalid payloads are dropped. The subscriber's `reconnecting` and `ready` report the subscription lost and restored.
+- Invalid payloads are dropped. The subscriber client's `connection` reports the subscription lost and restored.
 
 ## Example and tests
 

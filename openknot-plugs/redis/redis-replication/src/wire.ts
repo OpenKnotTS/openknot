@@ -31,6 +31,8 @@ export function redisReplicationChannel<const R extends Requirements = {}>(
       readonly commands: ReplicaCommands;
       readonly subscriber: ReplicaSubscriber;
     };
+    /** Watches the subscriber client, such as `redis.connection.subscriber` from `@openknot-ts/redis-client`. */
+    readonly connection: (dependencies: ResolvedReferences<R>) => NonNullable<ReplicaStoreOptions["connection"]>;
     readonly channel?: string | ((dependencies: ResolvedReferences<R>) => string);
   },
 ) {
@@ -39,7 +41,10 @@ export function redisReplicationChannel<const R extends Requirements = {}>(
     requirements: (options.requirements ?? {}) as R,
     factory: (dependencies: ResolvedReferences<R>) => {
       const channel = typeof options.channel === "function" ? options.channel(dependencies) : options.channel;
-      return redisReplicationChannelOf(options.connections(dependencies), channel === undefined ? {} : { channel });
+      return redisReplicationChannelOf(options.connections(dependencies), {
+        connection: options.connection(dependencies),
+        ...(channel === undefined ? {} : { channel }),
+      });
     },
   });
 }

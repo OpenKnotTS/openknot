@@ -289,7 +289,7 @@ Startup validation stays the complete check: same-signature contracts are one st
 ## Application status and connections
 
 - `applicationStatus` resolves to `() => ApplicationStatus`: `starting`, `ready`, `stopping` (synchronously inside `stop()`), `stopped`. Each application has its own; [`@openknot-ts/health`](../openknot-capabilities/health/README.md) builds on it.
-- `ConnectionWatch` reports a native connection's outages: `watch({ lost, restored })` returns an unsubscribe. Plugs build one with `connectionWatch(attach)`, which attaches to the client with the first watcher, detaches with the last and reports each outage once. Examples: `@openknot-ts/redis-client`'s `connection` and `@openknot-ts/rabbitmq`'s `rabbitConnection`; the cache, replication and outbox accept one.
+- `ConnectionWatch` reports a native connection's outages: `watch({ lost, restored })` returns an unsubscribe. Plugs build one with `connectionWatch(attach)`, which attaches to the client with the first watcher, detaches with the last and reports each outage once. Examples: `@openknot-ts/redis-client`'s `connection.commands` and `connection.subscriber`, and `@openknot-ts/rabbitmq`'s `rabbitConnection`; the cache, replication and outbox accept one.
 
 ## Introspection
 

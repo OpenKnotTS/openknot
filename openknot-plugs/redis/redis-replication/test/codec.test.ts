@@ -11,10 +11,26 @@ import { redisReplicationChannel } from "../src/wire.ts";
 import type { ReplicationHandlers } from "@openknot-ts/replication";
 import { ReplicaFenced, replicaStore } from "@openknot-ts/replication";
 import { replicationChannel } from "@openknot-ts/replication";
-import { composeModule, defineApplication, runApplication, unit } from "@openknot-ts/wire";
+import { composeModule, connectionWatch, defineApplication, runApplication, unit } from "@openknot-ts/wire";
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { test } from "node:test";
+
+const steady = { watch: () => () => undefined };
+
+/** A connection the test drops with `lost` and brings back with `restored`; `events` holds its watchers' listeners. */
+function outages() {
+  const events = new EventEmitter();
+  const connection = connectionWatch(({ lost, restored }) => {
+    events.on("lost", lost);
+    events.on("restored", restored);
+    return () => {
+      events.off("lost", lost);
+      events.off("restored", restored);
+    };
+  });
+  return { events, connection };
+}
 
 test("encoded orders compare as strings in the order of their values", () => {
   const orders = [0, 1, 9, 10, 99, 100, 2n ** 60n, "a", "b"] as const;
@@ -49,10 +65,11 @@ test("a channel listener does not throw on a malformed payload", async () => {
       return undefined;
     },
     unsubscribe: async () => undefined,
-    on: (event, listener) => listeners.set(String(event), listener),
-    off: (event) => listeners.delete(String(event)),
   };
-  const channel = redisReplicationChannelOf({ commands: { sendCommand: async () => 1 }, subscriber });
+  const channel = redisReplicationChannelOf(
+    { commands: { sendCommand: async () => 1 }, subscriber },
+    { connection: steady },
+  );
   const subscription = await channel.subscribe({
     message: () => undefined,
     lost: () => undefined,
@@ -69,31 +86,6 @@ test("redisReplicaStoreOf exposes a configured connection", () => {
   const connection = { watch: () => () => undefined };
   const store = redisReplicaStoreOf(commands, { connection });
   assert.equal(store.connection, connection);
-});
-
-test("native reconnection reports one loss and one restoration", async () => {
-  const listeners = new Map<string, () => void>();
-  const subscriber: ReplicaSubscriber = {
-    subscribe: async () => undefined,
-    unsubscribe: async () => undefined,
-    on: (event, listener) => listeners.set(String(event), listener),
-    off: (event) => listeners.delete(String(event)),
-  };
-  const events: string[] = [];
-  const handlers: ReplicationHandlers = {
-    message: () => events.push("message"),
-    lost: () => events.push("lost"),
-    restored: () => events.push("restored"),
-  };
-  const channel = redisReplicationChannelOf({ commands: { sendCommand: async () => 1 }, subscriber });
-  const subscription = await channel.subscribe(handlers);
-  listeners.get("ready")?.();
-  listeners.get("reconnecting")?.();
-  listeners.get("reconnecting")?.();
-  listeners.get("ready")?.();
-  assert.deepEqual(events, ["lost", "restored"]);
-  await subscription.close();
-  assert.equal(listeners.size, 0);
 });
 
 test("redisReplicaStore builds its connection from its requirements", async () => {
@@ -225,10 +217,11 @@ test("the channel drops malformed change entries before invoking its listener", 
     unsubscribe: async () => {
       listeners.delete("message");
     },
-    on: () => undefined,
-    off: () => undefined,
   };
-  const channel = redisReplicationChannelOf({ commands: { sendCommand: async () => 1 }, subscriber });
+  const channel = redisReplicationChannelOf(
+    { commands: { sendCommand: async () => 1 }, subscriber },
+    { connection: steady },
+  );
   const delivered: Parameters<ReplicationHandlers["message"]>[0][] = [];
   const ids: (string | number | bigint)[] = [];
   const subscription = await channel.subscribe({
@@ -255,11 +248,8 @@ test("the channel drops malformed change entries before invoking its listener", 
   assert.deepEqual(ids, ["r1", 2, 3n, "r4"]);
 });
 
-test("a failed subscription releases only its lifecycle listeners and a later subscription still works", async () => {
-  const events = new EventEmitter();
-  const external = () => undefined;
-  events.on("ready", external);
-  events.on("reconnecting", external);
+test("a subscription reports its connection's outages until it closes, and a failed one stops watching", async () => {
+  const { events, connection } = outages();
   const refusal = new Error("Subscription denied");
   let denied = true;
   const subscriber: ReplicaSubscriber = {
@@ -270,14 +260,8 @@ test("a failed subscription releases only its lifecycle listeners and a later su
       return undefined;
     },
     unsubscribe: async () => undefined,
-    on: (...args) => {
-      events.on(...args);
-    },
-    off: (...args) => {
-      events.off(...args);
-    },
   };
-  const channel = redisReplicationChannelOf({ commands: { sendCommand: async () => 1 }, subscriber });
+  const channel = redisReplicationChannelOf({ commands: { sendCommand: async () => 1 }, subscriber }, { connection });
   const observed: string[] = [];
   const handlers: ReplicationHandlers = {
     message: () => undefined,
@@ -289,27 +273,23 @@ test("a failed subscription releases only its lifecycle listeners and a later su
     },
   };
   await assert.rejects(channel.subscribe(handlers), (error) => error === refusal);
-  assert.deepEqual([events.listenerCount("ready"), events.listenerCount("reconnecting")], [1, 1]);
-  events.emit("reconnecting");
-  events.emit("ready");
-  assert.deepEqual(observed, []);
+  assert.equal(events.listenerCount("lost"), 0);
   denied = false;
   const subscription = await channel.subscribe(handlers);
   try {
-    assert.deepEqual([events.listenerCount("ready"), events.listenerCount("reconnecting")], [2, 2]);
-    events.emit("reconnecting");
-    events.emit("ready");
+    events.emit("lost");
+    events.emit("restored");
     assert.deepEqual(observed, ["lost", "restored"]);
   } finally {
     await subscription.close();
   }
-  assert.deepEqual([events.listenerCount("ready"), events.listenerCount("reconnecting")], [1, 1]);
-  events.emit("reconnecting");
-  events.emit("ready");
+  assert.equal(events.listenerCount("lost"), 0);
+  events.emit("lost");
+  events.emit("restored");
   assert.deepEqual(observed, ["lost", "restored"]);
 });
 
-test("redisReplicationChannel subscribes on the connections its requirements resolve", async () => {
+test("redisReplicationChannel subscribes and watches on what its requirements resolve", async () => {
   const subscribed: string[] = [];
   const subscriber: ReplicaSubscriber = {
     subscribe: async (channel) => {
@@ -317,14 +297,16 @@ test("redisReplicationChannel subscribes on the connections its requirements res
       return undefined;
     },
     unsubscribe: async () => undefined,
-    on: () => undefined,
-    off: () => undefined,
   };
-  const redis = unit({ factory: () => ({ commands: { sendCommand: async () => 1 }, subscriber }) });
+  const { events, connection } = outages();
+  const redis = unit({
+    factory: () => ({ commands: { sendCommand: async () => 1 }, subscriber, connection: { subscriber: connection } }),
+  });
   const settings = unit({ factory: () => ({ channel: "app" }) });
   const binding = redisReplicationChannel({
     requirements: { redis, settings },
     connections: ({ redis }) => redis,
+    connection: ({ redis }) => redis.connection.subscriber,
     channel: ({ settings }) => settings.channel,
   });
   const app = await runApplication(
@@ -338,6 +320,7 @@ test("redisReplicationChannel subscribes on the connections its requirements res
       restored: () => undefined,
     });
     assert.deepEqual(subscribed, ["app"]);
+    assert.equal(events.listenerCount("lost"), 1);
     await subscription.close();
   } finally {
     await app.stop();

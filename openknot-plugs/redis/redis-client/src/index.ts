@@ -22,6 +22,8 @@ export type RedisCommands = {
 export type RedisSubscriber = {
   subscribe: typeof RedisClient.prototype.subscribe<false>;
   unsubscribe: typeof RedisClient.prototype.unsubscribe<false>;
+  sSubscribe: typeof RedisClient.prototype.sSubscribe<false>;
+  sUnsubscribe: typeof RedisClient.prototype.sUnsubscribe<false>;
   on(...args: Parameters<RedisClientType["on"]>): void;
   off(...args: Parameters<RedisClientType["off"]>): void;
 };
@@ -37,7 +39,7 @@ export type RedisManagedClient = Pick<RedisClientType, "close" | "destroy" | "is
   off(...args: Parameters<RedisClientType["off"]>): void;
 };
 
-export function redisConnectionOf(client: RedisCommands & RedisManagedClient): ConnectionWatch {
+export function redisConnectionOf(client: Pick<RedisManagedClient, "on" | "off">): ConnectionWatch {
   return connectionWatch(({ lost, restored }) => {
     client.on("reconnecting", lost);
     client.on("end", lost);
@@ -51,12 +53,16 @@ export function redisConnectionOf(client: RedisCommands & RedisManagedClient): C
 }
 
 /**
- * An active check of a Redis resource: it sends PING and reports up only for PONG. The check's deadline, `timeoutMs`,
- * reports down and aborts the check's signal, which withdraws a PING still waiting to be sent, such as during a
- * reconnection.
+ * An active check of a Redis resource: it reports up only while the subscriber client is ready and the commands client
+ * answers PING with PONG. The check's deadline, `timeoutMs`, reports down and aborts the check's signal, which
+ * withdraws a PING still waiting to be sent, such as during a reconnection.
  */
 export function redisHealthCheck(options: {
-  readonly redis: Provider<ManagedResource<{ readonly commands: RedisCommands }>, never, "resource">;
+  readonly redis: Provider<
+    ManagedResource<{ readonly commands: RedisCommands; readonly subscriber: Pick<RedisManagedClient, "isReady"> }>,
+    never,
+    "resource"
+  >;
   readonly name?: string;
   readonly timeoutMs?: number;
 }): HealthCheckDefinition<{ readonly redis: typeof options.redis }> {
@@ -66,7 +72,9 @@ export function redisHealthCheck(options: {
     requirements: { redis },
     ...(timeoutMs === undefined ? {} : { timeoutMs }),
     check: async ({ redis }, { signal }) =>
-      (await redis.commands.sendCommand(["PING"], { abortSignal: signal })) === "PONG" ? "up" : "down",
+      redis.subscriber.isReady && (await redis.commands.sendCommand(["PING"], { abortSignal: signal })) === "PONG"
+        ? "up"
+        : "down",
   });
 }
 
@@ -200,7 +208,11 @@ export function redisClient<const R extends Requirements = {}, C extends RedisCo
       } finally {
         acquisition.signal.removeEventListener("abort", abort);
       }
-      const connection = redisConnectionOf(clients.commands);
+      // Each client reconnects on its own, so each has its own watch: work follows the client it uses.
+      const connection = Object.freeze({
+        commands: redisConnectionOf(clients.commands),
+        subscriber: redisConnectionOf(clients.subscriber),
+      });
       return {
         value: Object.assign(clients, { connection }),
         async release() {

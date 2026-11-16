@@ -1,3 +1,4 @@
+import { redisConnectionOf } from "@openknot-ts/redis-client";
 import { createClient } from "redis";
 
 /** Native node-redis connections shared by the focused example and broker tests. */
@@ -25,6 +26,7 @@ export async function redisConnections(url: string) {
   return {
     commands,
     subscriber,
+    connection: { commands: redisConnectionOf(commands), subscriber: redisConnectionOf(subscriber) },
     async close() {
       const results = await Promise.allSettled(native.map((client) => client.close()));
       const errors = results.flatMap((result) => (result.status === "rejected" ? [result.reason as unknown] : []));

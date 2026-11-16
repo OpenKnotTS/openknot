@@ -16,8 +16,6 @@ export type ReplicaCommands = {
 export type ReplicaSubscriber = {
   subscribe: typeof RedisClient.prototype.subscribe<false>;
   unsubscribe: typeof RedisClient.prototype.unsubscribe<false>;
-  on(...args: Parameters<RedisClientType["on"]>): void;
-  off(...args: Parameters<RedisClientType["off"]>): void;
 };
 
 export interface ReplicaStoreOptions {
@@ -351,9 +349,13 @@ export function redisReplicaStoreOf(commands: ReplicaCommands, options: ReplicaS
   } as ReplicaStore);
 }
 
+/**
+ * The channel over a commands client that publishes and a subscriber client that listens. `connection` watches the
+ * subscriber client: its outages are the subscription's, when messages may be missed.
+ */
 export function redisReplicationChannelOf(
   connections: { readonly commands: ReplicaCommands; readonly subscriber: ReplicaSubscriber },
-  options: { readonly channel?: string } = {},
+  options: { readonly connection: NonNullable<ReplicaStore["connection"]>; readonly channel?: string },
 ): ReplicationChannel {
   const name = options.channel ?? "openknot:replication";
   return Object.freeze({
@@ -361,8 +363,6 @@ export function redisReplicationChannelOf(
       await connections.commands.sendCommand(["PUBLISH", name, encodeMessage(message)]);
     },
     async subscribe(handlers: Parameters<ReplicationChannel["subscribe"]>[0]) {
-      let lost = false;
-
       // The channel carries only replication messages; anything else on it is not addressed to this replication.
       const listener = (text: string) => {
         const message = decodeMessage(text);
@@ -371,38 +371,18 @@ export function redisReplicationChannelOf(
         }
       };
 
-      const reconnecting = () => {
-        if (lost) {
-          return;
-        }
-        lost = true;
-        handlers.lost();
-      };
-
-      const ready = () => {
-        if (!lost) {
-          return;
-        }
-        lost = false;
-        handlers.restored();
-      };
-
-      const detach = () => {
-        connections.subscriber.off("reconnecting", reconnecting);
-        connections.subscriber.off("ready", ready);
-      };
-      connections.subscriber.on("reconnecting", reconnecting);
-      connections.subscriber.on("ready", ready);
+      // Watched before subscribing, so an outage while the subscription is being made is reported.
+      const unwatch = options.connection.watch({ lost: handlers.lost, restored: handlers.restored });
       try {
         await connections.subscriber.subscribe(name, listener);
       } catch (error) {
-        detach();
+        unwatch();
         throw error;
       }
 
       return {
         async close() {
-          detach();
+          unwatch();
           await connections.subscriber.unsubscribe(name, listener);
         },
       };

@@ -153,7 +153,7 @@ test("the channel delivers published messages to subscribers", { skip }, async (
   const listening = await redisConnections(url!);
   const channel = redisReplicationChannelOf(
     { commands: publisher.commands, subscriber: listening.subscriber },
-    { channel: `openknot-test:${randomUUID()}` },
+    { channel: `openknot-test:${randomUUID()}`, connection: listening.connection.subscriber },
   );
   let received: (message: ReplicationMessage) => void = () => undefined;
   const delivered = new Promise<ReplicationMessage>((resolve) => {

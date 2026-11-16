@@ -7,6 +7,7 @@ export interface InMemoryBroadcast<Message> extends BroadcastImplementation<Mess
   publish(message: Message, options?: DeliveryOptions): void;
   subscribe(options?: DeliveryOptions): AsyncIterableIterator<Message, void>;
   subscriberCount(): number;
+  interrupt(reason: unknown): void;
 }
 export interface InMemoryBroadcastOptions extends InMemoryPubSubOptions {
   readonly event: NodeEventName;
@@ -24,6 +25,7 @@ export function inMemoryBroadcast<Message>(
           managed.value.publish(undefined, message, execution),
         subscribe: (execution?: DeliveryOptions) => managed.value.subscribe(undefined, execution),
         subscriberCount: () => managed.value.subscriberCount(),
+        interrupt: (reason: unknown) => managed.value.interrupt(reason),
       }),
       release: () => managed.release(),
     };

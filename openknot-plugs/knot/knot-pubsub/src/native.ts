@@ -20,12 +20,15 @@ export type SlowSubscriberError = ReturnType<typeof SlowSubscriberError>;
 interface Subscription<Key> {
   readonly key: Key;
   readonly close: () => Promise<void>;
+  readonly fail: (reason: unknown) => void;
 }
 export interface InMemoryPubSub<Key, Message> {
   publish(key: Key, message: Message, options?: DeliveryOptions): void;
   subscribe(key: Key, options?: DeliveryOptions): AsyncIterableIterator<Message, void>;
   keys(): readonly Key[];
   subscriberCount(key: Key): number;
+  /** Ends every active subscription with `reason`, discarding its queue; later subscriptions open as usual. */
+  interrupt(reason: unknown): void;
 }
 
 /** EventEmitter owns routing/listeners; each native stream owns its bounded message queue. */
@@ -92,13 +95,18 @@ export function inMemoryPubSub<Key, Message>(
             signal?.removeEventListener("abort", onAbort);
             events.off(name, receive);
           }
+          function fail(reason: unknown): void {
+            if (active) {
+              detach();
+              controller.error(reason);
+            }
+          }
           function receive(message: Message): void {
             if (!active) {
               return;
             }
             if ((controller.desiredSize ?? 0) <= 0) {
-              detach();
-              controller.error(SlowSubscriberError(capacity));
+              fail(SlowSubscriberError(capacity));
             } else {
               controller.enqueue(message);
             }
@@ -149,7 +157,7 @@ export function inMemoryPubSub<Key, Message>(
               throw error;
             },
           };
-          subscriptions.set(receive, { key, close });
+          subscriptions.set(receive, { key, close, fail });
           try {
             events.on(name, receive);
             signal?.addEventListener("abort", onAbort, { once: true });
@@ -172,6 +180,13 @@ export function inMemoryPubSub<Key, Message>(
         },
         subscriberCount(key: Key): number {
           return owned(event(key)).length;
+        },
+        interrupt(reason: unknown): void {
+          for (const name of events.eventNames()) {
+            for (const subscription of owned(name)) {
+              subscription.fail(reason);
+            }
+          }
         },
       }),
       release(): Promise<void> {

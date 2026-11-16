@@ -1,5 +1,5 @@
 import type { ErrorOf, Event, OperationDraft } from "../src/index.ts";
-import { error, failure, operation, reader, standalone, success, unchanged, updated } from "../src/index.ts";
+import { created, error, failure, operation, reader, standalone, success, unchanged, updated } from "../src/index.ts";
 import { override } from "@openknot-ts/wire";
 import type { Application } from "@openknot-ts/wire";
 import "../src/wire.ts";
@@ -127,4 +127,44 @@ operation<State, State, Changed>()({ run: () => success({ output: [], events: []
 operation<State, State>()({
   // @ts-expect-error every change in the list carries the declared state
   run: (current) => success({ output: [updated(current), updated(1)] }),
+});
+
+// Created and updated are separate members, yet either one may carry the declared events.
+const save = operation<{ readonly state: State; readonly isNew: boolean }, State, Changed>()({
+  run: ({ state, isNew }) =>
+    success({ output: isNew ? created(state) : updated(state), events: [{ type: "Changed", name: state.name }] }),
+});
+operation<{ readonly state: State; readonly isNew: boolean }, State, Changed>()({
+  run: ({ state, isNew }) =>
+    success({
+      output: isNew ? { changeType: "created", next: state } : { changeType: "updated", next: state },
+      events: [{ type: "Changed", name: state.name }],
+    }),
+});
+export async function verifySave(input: { readonly state: State; readonly isNew: boolean }): Promise<void> {
+  const saved = await standalone(save)(input);
+  if (!saved.isError) {
+    expectType<State>(saved.value.output.next);
+    expectType<readonly Changed[]>(saved.value.events);
+  }
+}
+operation<{ readonly state: State; readonly isNew: boolean }, State, Changed>()({
+  run: ({ state, isNew }) =>
+    // @ts-expect-error a result that may be unchanged cannot publish declared events
+    success({ output: isNew ? created(state) : unchanged(state), events: [{ type: "Changed", name: state.name }] }),
+});
+const unchangedList: OperationDraft<readonly { readonly changeType: "unchanged"; readonly current: State }[], Changed> =
+  {
+    output: [{ changeType: "unchanged", current: { id: "id", name: "Name" } }],
+    // @ts-expect-error a list of only unchanged outputs cannot publish declared events
+    events: [{ type: "Changed", name: "Name" }],
+  };
+void unchangedList;
+operation<State, State, Changed>()({
+  run: (current) =>
+    // @ts-expect-error a created output cannot also carry a previous state
+    success({
+      output: { changeType: "created", next: current, previous: current },
+      events: [{ type: "Changed", name: current.name }],
+    }),
 });

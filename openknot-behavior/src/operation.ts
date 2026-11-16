@@ -43,16 +43,13 @@ type IsUnchanged<Output> = [Output] extends [readonly (infer Change)[]]
     ? true
     : false;
 
-type EmittedEvents<Output, E extends Event> = Output extends unknown
-  ? IsUnchanged<Output> extends true
-    ? never
-    : E
-  : never;
-type ChangedDraft<Output, E extends Event> = Output extends unknown
-  ? IsUnchanged<Output> extends true
-    ? never
-    : { readonly output: Output; readonly events: readonly E[] }
-  : never;
+/** The members of Output that carry a change; a list of only unchanged outputs carries none. */
+type Changes<Output> = Output extends unknown ? (IsUnchanged<Output> extends true ? never : Output) : never;
+
+type EmittedEvents<Output, E extends Event> = [Changes<Output>] extends [never] ? never : E;
+type ChangedDraft<Output, E extends Event> = [Changes<Output>] extends [never]
+  ? never
+  : { readonly output: Changes<Output>; readonly events: readonly E[] };
 
 export type OperationDraft<
   Output extends OperationChanges<unknown> = OperationChanges<unknown>,
